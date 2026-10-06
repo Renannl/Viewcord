@@ -28,8 +28,8 @@ if (!gotLock) {
   app.quit();
 } else {
   app.on("second-instance", (event, commandLine, workingDirectory) => {
-    console.log("🔄 Segunda instância detectada");
-    console.log("📋 commandLine:", commandLine);
+    console.log("Segunda instância detectada");
+    console.log("commandLine:", commandLine);
 
     const url = commandLine.find((arg) => arg.startsWith("viewcord://"));
     if (url && mainWindow) {
@@ -42,9 +42,11 @@ if (!gotLock) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 420,
-    height: 520,
-    resizable: false,
+    width: 1200,
+    height: 800,
+    minWidth: 640,
+    minHeight: 480,
+    resizable: true,
     frame: false,
     icon: path.join(__dirname, "assets/icon.png"),
     webPreferences: {
@@ -66,44 +68,43 @@ app.whenReady().then(async () => {
 
   try {
     await initDiscordRPC();
-    console.log("✅ Discord RPC inicializado");
+    console.log("Discord RPC inicializado");
   } catch (err) {
-    console.log("⚠️ Discord RPC não conectado:", err.message);
+    console.log("Discord RPC não conectado:", err.message);
   }
 
   setInterval(() => {
-    console.log("♻️ Atualizando presence. Room atual:", currentRoomId);
+    console.log("Atualizando presence. Room atual:", currentRoomId);
     updatePresence(currentRoomId);
   }, 15000);
 
-  // Captura deep link quando o app é aberto via protocolo no Windows
   const initialUrl = process.argv.find((arg) => arg.startsWith("viewcord://"));
   if (initialUrl) {
-    console.log("🚀 URL inicial:", initialUrl);
+    console.log("URL inicial:", initialUrl);
     setTimeout(() => handleDeepLink(initialUrl), 1000);
   }
 });
 
 app.on("open-url", (event, url) => {
   event.preventDefault();
-  console.log("🍎 open-url (macOS):", url);
+  console.log("open-url (macOS):", url);
   handleDeepLink(url);
 });
 
 function handleDeepLink(url) {
   if (!url) return;
-  console.log("🔗 Processando deep link:", url);
+  console.log("Processando deep link:", url);
 
   const match = url.match(/room=([^&/?]+)/);
   if (match && mainWindow) {
     const roomId = match[1];
-    console.log("🆔 Room ID extraído:", roomId);
+    console.log("Room ID extraído:", roomId);
     mainWindow.webContents.send("deep-link", roomId);
   }
 }
 
 ipcMain.handle("update-room", (event, roomId) => {
-  console.log("📝 Room atualizada:", roomId);
+  console.log("Room atualizada:", roomId);
   currentRoomId = roomId;
   updatePresence(roomId);
   return true;

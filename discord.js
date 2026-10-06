@@ -8,7 +8,7 @@ let connected = false;
 async function initDiscordRPC() {
   rpc.on("ready", () => {
     connected = true;
-    console.log("✅ Conectado ao Discord RPC");
+    console.log("Conectado ao Discord RPC");
     updatePresence(null);
   });
 
@@ -20,7 +20,7 @@ function updatePresence(roomId) {
 
   const activity = {
     details: roomId ? "Compartilhando tela" : "Aguardando",
-    state: roomId ? "Clique no botão 👇" : "ViewCord",
+    state: roomId ? "Clique no botão" : "ViewCord",
     largeImageKey: "viewcord_logo",
     largeImageText: "ViewCord",
     startTimestamp: Date.now(),
@@ -30,7 +30,7 @@ function updatePresence(roomId) {
   if (roomId) {
     activity.buttons = [
       {
-        label: "📺 Assistir Tela",
+        label: "Assistir Tela",
         url: `https://viewcord-site.vercel.app/join?room=${roomId}`,
       },
     ];

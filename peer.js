@@ -32,7 +32,6 @@ async function initPeer() {
         const { BrowserWindow } = require('electron');
         const win = BrowserWindow.getAllWindows()[0];
         if (win) {
-          // Electron não serializa MediaStream direto, então manda o ID
           win.webContents.send('remote-stream-ready', call.peer);
         }
       });
