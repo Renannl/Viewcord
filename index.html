@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ViewCord</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="window">
+      <header class="titlebar">
+        <span class="title">ViewCord</span>
+        <div class="controls">
+          <button class="btn-min" onclick="viewcord.minimize()">−</button>
+          <button class="btn-close" onclick="viewcord.close()">×</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div id="screen-idle" class="screen">
+          <h2>Compartilhe sua tela</h2>
+          <p class="subtitle">
+            Mantenha a call no Discord, compartilhe por aqui
+          </p>
+
+          <button id="btn-start" class="btn-primary">
+            Começar a Compartilhar
+          </button>
+
+          <div class="divider">ou entre numa sala</div>
+
+          <div class="join-row">
+            <input
+              type="text"
+              id="room-input"
+              placeholder="Cole o ID da sala"
+            />
+            <button id="btn-join" class="btn-secondary">Entrar</button>
+          </div>
+        </div>
+
+        <div id="screen-sharing" class="screen hidden">
+          <h2>● Ao vivo</h2>
+          <p class="subtitle">Compartilhando sua tela</p>
+
+          <div class="room-info">
+            <label>ID da sala (compartilhe com amigos):</label>
+            <div class="room-id-box">
+              <code id="room-id">-</code>
+              <button id="btn-copy" class="btn-icon" title="Copiar">📋</button>
+            </div>
+          </div>
+
+          <button id="btn-stop" class="btn-danger">
+            Parar Compartilhamento
+          </button>
+        </div>
+
+        <div id="screen-watching" class="screen hidden">
+          <h2>Assistindo</h2>
+          <video id="remote-video" autoplay playsinline></video>
+          <button id="btn-leave" class="btn-secondary">Sair</button>
+        </div>
+      </main>
+
+      <footer class="statusbar">
+        <span id="status">⚪ Conectando...</span>
+      </footer>
+    </div>
+
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="renderer.js"></script>
+  </body>
+</html>

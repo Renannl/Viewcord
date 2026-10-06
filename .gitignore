@@ -1,0 +1,17 @@
+node_modules/
+tmp/
+dist/
+out/
+*.exe
+*.zip
+*.dmg
+*.AppImage
+.env
+.env.local
+logs/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
