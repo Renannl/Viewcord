@@ -122,11 +122,6 @@ app.whenReady().then(async () => {
     console.log("Discord RPC não conectado:", err.message);
   }
 
-  setInterval(() => {
-    console.log("Atualizando presence. Room atual:", currentRoomId);
-    updatePresence(currentRoomId);
-  }, 15000);
-
   const initialUrl = process.argv.find((arg) => arg.startsWith("viewcord://"));
   if (initialUrl) {
     console.log("URL inicial:", initialUrl);

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder"
+    "build": "electron-builder --win nsis"
   },
   "dependencies": {
     "discord-rpc": "^4.0.1",
@@ -14,22 +14,28 @@
   },
   "devDependencies": {
     "electron": "^32.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.1.8"
   },
   "build": {
     "appId": "com.viewcord.app",
-    "productName": "viewcord",
+    "productName": "ViewCord",
     "protocols": [
       {
-        "name": "viewcord",
+        "name": "ViewCord",
         "schemes": [
           "viewcord"
         ]
       }
     ],
-    "files": [
-      "**/*",
-      "!node_modules/**/*"
-    ]
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
