@@ -458,3 +458,40 @@ h2 {
 ::-webkit-scrollbar-thumb:hover {
   background: #2b2d31;
 }
+
+.quality-select-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quality-select-wrapper label {
+  font-size: 11px;
+  color: #949ba4;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+
+#quality-select {
+  padding: 12px;
+  border: 1px solid #3f4147;
+  border-radius: 8px;
+  background: #1e1f22;
+  color: #dbdee1;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+#quality-select:hover {
+  border-color: #5865f2;
+}
+
+#quality-select:focus {
+  border-color: #5865f2;
+  box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2);
+}

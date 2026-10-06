@@ -6,6 +6,7 @@ const screens = {
 
 const statusEl = document.getElementById("status");
 const btnStart = document.getElementById("btn-start");
+const qualitySelect = document.getElementById("quality-select");
 
 let peer = null;
 let currentCall = null;
@@ -97,6 +98,34 @@ async function showSourcePicker() {
   });
 }
 
+function getVideoConstraints(sourceId) {
+  const quality = qualitySelect.value;
+  const base = {
+    chromeMediaSource: "desktop",
+    chromeMediaSourceId: sourceId,
+  };
+
+  if (quality === "fhd") {
+    return {
+      ...base,
+      minWidth: 1920,
+      maxWidth: 1920,
+      minHeight: 1080,
+      maxHeight: 1080,
+      maxFrameRate: 60,
+    };
+  }
+
+  return {
+    ...base,
+    minWidth: 1280,
+    maxWidth: 1280,
+    minHeight: 720,
+    maxHeight: 720,
+    maxFrameRate: 30,
+  };
+}
+
 async function startShare() {
   if (!peerReady || !peer.id) {
     throw new Error("P2P ainda não conectou. Aguarde...");
@@ -108,15 +137,7 @@ async function startShare() {
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: false,
     video: {
-      mandatory: {
-        chromeMediaSource: "desktop",
-        chromeMediaSourceId: source.id,
-        minWidth: 1280,
-        maxWidth: 1280,
-        minHeight: 720,
-        maxHeight: 720,
-        maxFrameRate: 30,
-      },
+      mandatory: getVideoConstraints(source.id),
     },
   });
 
