@@ -13,6 +13,9 @@ const { initDiscordRPC, updatePresence, stopPresence } = require("./discord");
 
 let mainWindow;
 let currentRoomId = null;
+
+const APP_ICON = path.join(__dirname, "assets", "icon.png"); // janela + taskbar (256x256 ou .ico)
+const TRAY_ICON = path.join(__dirname, "assets", "tray.png");
 let tray = null;
 let isQuitting = false;
 
@@ -47,16 +50,14 @@ if (!gotLock) {
 }
 
 function createTray() {
-  const icon = nativeImage.createFromPath(
-    path.join(__dirname, "assets", "tray.png"),
-  );
+  const icon = nativeImage.createFromPath(TRAY_ICON);
 
   tray = new Tray(icon);
-  tray.setToolTip("Viewcord");
+  tray.setToolTip("ViewCord");
 
   const menu = Menu.buildFromTemplate([
     {
-      label: "Abrir Viewcord",
+      label: "Abrir ViewCord",
       click: () => {
         mainWindow.show();
         mainWindow.focus();
@@ -88,7 +89,7 @@ function createWindow() {
     minHeight: 480,
     resizable: true,
     frame: false,
-    icon: path.join(__dirname, "assets/icon.png"),
+    icon: APP_ICON,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
