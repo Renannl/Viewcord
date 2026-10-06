@@ -186,6 +186,17 @@ document.getElementById("btn-leave").addEventListener("click", () => {
   statusEl.textContent = "⚪ Parado";
 });
 
+document
+  .getElementById("btn-video-fullscreen")
+  .addEventListener("click", () => {
+    const video = document.getElementById("remote-video");
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      video.requestFullscreen();
+    }
+  });
+
 document.getElementById("btn-join").addEventListener("click", async () => {
   const roomId = document.getElementById("room-input").value.trim();
   if (!roomId) return;

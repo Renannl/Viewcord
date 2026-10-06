@@ -57,9 +57,18 @@
         </div>
 
         <div id="screen-watching" class="screen hidden">
-          <h2>Assistindo</h2>
-          <video id="remote-video" autoplay playsinline></video>
-          <button id="btn-leave" class="btn-secondary">Sair</button>
+          <h2>Assistindo transmissão</h2>
+          <div class="video-wrapper">
+            <video id="remote-video" autoplay playsinline></video>
+            <button
+              id="btn-video-fullscreen"
+              class="btn-video-fs"
+              title="Tela cheia"
+            >
+              ⛶
+            </button>
+          </div>
+          <button id="btn-leave">Sair</button>
         </div>
       </main>
 
