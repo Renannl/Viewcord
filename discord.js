@@ -20,9 +20,9 @@ function updatePresence(roomId) {
 
   const activity = {
     details: roomId ? "Compartilhando tela" : "Aguardando",
-    state: roomId ? "Clique no botão" : "ViewCord",
+    state: roomId ? "Clique no botão" : "Viewcord",
     largeImageKey: "viewcord_logo",
-    largeImageText: "ViewCord",
+    largeImageText: "Viewcord",
     startTimestamp: Date.now(),
     instance: false,
   };

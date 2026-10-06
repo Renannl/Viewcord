@@ -4,12 +4,17 @@ const {
   ipcMain,
   protocol,
   desktopCapturer,
+  Tray,
+  Menu,
+  nativeImage,
 } = require("electron");
 const path = require("path");
 const { initDiscordRPC, updatePresence, stopPresence } = require("./discord");
 
 let mainWindow;
 let currentRoomId = null;
+let tray = null;
+let isQuitting = false;
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "viewcord", privileges: { standard: true, secure: true } },
@@ -34,9 +39,44 @@ if (!gotLock) {
     const url = commandLine.find((arg) => arg.startsWith("viewcord://"));
     if (url && mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
       mainWindow.focus();
       handleDeepLink(url);
     }
+  });
+}
+
+function createTray() {
+  const icon = nativeImage.createFromPath(
+    path.join(__dirname, "assets", "tray.png"),
+  );
+
+  tray = new Tray(icon);
+  tray.setToolTip("Viewcord");
+
+  const menu = Menu.buildFromTemplate([
+    {
+      label: "Abrir Viewcord",
+      click: () => {
+        mainWindow.show();
+        mainWindow.focus();
+      },
+    },
+    { type: "separator" },
+    {
+      label: "Sair",
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setContextMenu(menu);
+
+  tray.on("click", () => {
+    mainWindow.show();
+    mainWindow.focus();
   });
 }
 
@@ -58,6 +98,13 @@ function createWindow() {
 
   mainWindow.loadFile("index.html");
 
+  mainWindow.on("close", (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -65,6 +112,7 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   createWindow();
+  createTray();
 
   try {
     await initDiscordRPC();
@@ -91,6 +139,10 @@ app.on("open-url", (event, url) => {
   handleDeepLink(url);
 });
 
+app.on("before-quit", () => {
+  isQuitting = true;
+});
+
 function handleDeepLink(url) {
   if (!url) return;
   console.log("Processando deep link:", url);
@@ -99,6 +151,11 @@ function handleDeepLink(url) {
   if (match && mainWindow) {
     const roomId = match[1];
     console.log("Room ID extraído:", roomId);
+
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+
     mainWindow.webContents.send("deep-link", roomId);
   }
 }
@@ -138,6 +195,9 @@ ipcMain.on("window-close", () => {
 });
 
 app.on("window-all-closed", () => {
-  stopPresence();
-  app.quit();
+  if (process.platform !== "darwin" && !isQuitting) {
+  } else {
+    stopPresence();
+    app.quit();
+  }
 });
