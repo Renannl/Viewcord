@@ -1,7 +1,7 @@
 {
   "name": "viewcord",
   "version": "0.1.0",
-  "description": "Compartilhe sua tela com amigos enquanto mantém a call no Discord",
+  "description": "Viewcord",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -57,10 +57,13 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico"
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
       "runAfterFinish": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
