@@ -2,32 +2,33 @@
 
 $ErrorActionPreference = "Stop"
 $repository = "Renannl/Viewcord"
-$installerName = "ViewCord-Setup-0.1.0.exe"
 
-Write-Host "Buscando a versao mais recente do Viewcord..."
+Write-Host "Buscando a versão mais recente do ViewCord..."
 
 $release = Invoke-RestMethod `
   -Uri "https://api.github.com/repos/$repository/releases/latest" `
   -Headers @{ "User-Agent" = "Viewcord-Installer" }
 
 $asset = $release.assets |
-  Where-Object { $_.name -eq $installerName } |
+  Where-Object { $_.name -like "*.exe" } |
   Select-Object -First 1
 
 if (-not $asset) {
-  throw "Não encontrei o arquivo $installerName na release mais recente."
+  throw "Não encontrei nenhum arquivo .exe na release mais recente."
 }
+
+Write-Host "Arquivo encontrado: $($asset.name)"
 
 $installerPath = [System.IO.Path]::Combine($env:TEMP, $asset.name)
 
 Write-Host "Baixando instalador..."
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installerPath
 
-Write-Host "Instalando..."
+Write-Host "Instalando silenciosamente..."
 Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
 
 if (Test-Path -LiteralPath $installerPath) {
     Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "Viewcord instalado com sucesso!"
+Write-Host "ViewCord instalado com sucesso!"
