@@ -14,8 +14,10 @@ const { initDiscordRPC, updatePresence, stopPresence } = require("./discord");
 let mainWindow;
 let currentRoomId = null;
 
-const APP_ICON = path.join(__dirname, "assets", "icon.png"); // janela + taskbar (256x256 ou .ico)
+const APP_ICON = path.join(__dirname, "assets", "icon.png");
 const TRAY_ICON = path.join(__dirname, "assets", "tray.png");
+const START_HIDDEN = process.argv.includes("--hidden");
+
 let tray = null;
 let isQuitting = false;
 
@@ -89,6 +91,7 @@ function createWindow() {
     minHeight: 480,
     resizable: true,
     frame: false,
+    show: false,
     icon: APP_ICON,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -98,6 +101,12 @@ function createWindow() {
   });
 
   mainWindow.loadFile("index.html");
+
+  mainWindow.once("ready-to-show", () => {
+    if (!START_HIDDEN) {
+      mainWindow.show();
+    }
+  });
 
   mainWindow.on("close", (event) => {
     if (!isQuitting) {
@@ -114,6 +123,11 @@ function createWindow() {
 app.whenReady().then(async () => {
   createWindow();
   createTray();
+
+  app.setLoginItemSettings({
+    openAtLogin: true,
+    args: ["--hidden"],
+  });
 
   try {
     await initDiscordRPC();

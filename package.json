@@ -18,8 +18,8 @@
   },
   "build": {
     "appId": "com.viewcord.app",
-    "productName": "ViewCord",
-    "copyright": "Copyright © 2026 ViewCord",
+    "productName": "Viewcord",
+    "copyright": "Copyright © 2026 Viewcord",
     "directories": {
       "output": "dist"
     },
@@ -40,7 +40,7 @@
     "buildDependenciesFromSource": false,
     "protocols": [
       {
-        "name": "ViewCord",
+        "name": "Viewcord",
         "schemes": [
           "viewcord"
         ]
@@ -64,7 +64,7 @@
       "deleteAppDataOnUninstall": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "ViewCord",
+      "shortcutName": "Viewcord",
       "artifactName": "ViewCord-Setup-${version}.exe"
     }
   }
