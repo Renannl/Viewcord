@@ -34,8 +34,13 @@ if (Test-Path -LiteralPath $installerPath) {
 
 $appPath = "$env:LOCALAPPDATA\Programs\ViewCord\ViewCord.exe"
 if (Test-Path -LiteralPath $appPath) {
-    Write-Host "Abrindo ViewCord na bandeja..."
-    Start-Process -FilePath $appPath -ArgumentList "--hidden"
+    Write-Host "Abrindo ViewCord na bandeja (desvinculado do PowerShell)..."
+    Start-Process `
+        -FilePath $appPath `
+        -ArgumentList "--hidden" `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput "$env:TEMP\viewcord_stdout.log" `
+        -RedirectStandardError "$env:TEMP\viewcord_stderr.log"
 } else {
     Write-Host "ViewCord.exe nao encontrado em $appPath"
     Write-Host "Listando conteudo da pasta de instalacao..."
