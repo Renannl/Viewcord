@@ -34,7 +34,7 @@ if (Test-Path -LiteralPath $installerPath) {
 
 $appPath = "$env:LOCALAPPDATA\Programs\ViewCord\ViewCord.exe"
 if (Test-Path -LiteralPath $appPath) {
-    Write-Host "Abrindo ViewCord na bandeja (desvinculado do PowerShell)..."
+    Write-Host "Abrindo Viewcord na bandeja..."
     Start-Process `
         -FilePath $appPath `
         -ArgumentList "--hidden" `
