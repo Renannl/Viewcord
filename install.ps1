@@ -1,8 +1,8 @@
-# Uso para instalar:
 # iwr -useb https://raw.githubusercontent.com/Renannl/Viewcord/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 $repository = "Renannl/Viewcord"
+$installerName = "ViewCord-Setup-0.1.0.exe"
 
 Write-Host "Buscando a versão mais recente do ViewCord..."
 
@@ -10,23 +10,21 @@ $release = Invoke-RestMethod `
   -Uri "https://api.github.com/repos/$repository/releases/latest" `
   -Headers @{ "User-Agent" = "Viewcord-Installer" }
 
-$installerAsset = $release.assets |
-  Where-Object { $_.name -match "(?i)setup.*\.exe$" } |
+$asset = $release.assets |
+  Where-Object { $_.name -eq $installerName } |
   Select-Object -First 1
 
-if (-not $installerAsset) {
-  throw "Não encontrei o instalador Setup .exe na release mais recente do GitHub."
+if (-not $asset) {
+  throw "Não encontrei o arquivo $installerName na release mais recente."
 }
 
-$installerPath = Join-Path $env:TEMP $installerAsset.name
+$installerPath = Join-Path $env:TEMP $asset.name
 
-Write-Host "Baixando $($installerAsset.name)..."
-Invoke-WebRequest `
-  -Uri $installerAsset.browser_download_url `
-  -OutFile $installerPath
+Write-Host "Baixando instalador..."
+Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installerPath
 
-Write-Host "Abrindo o instalador do ViewCord..."
-Start-Process -FilePath $installerPath -Wait
+Write-Host "Instalando silenciosamente..."
+Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
 
 Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
-Write-Host "Concluído."
+Write-Host "ViewCord instalado com sucesso!"

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder --win nsis"
+    "pack": "electron-builder --win nsis"
   },
   "dependencies": {
     "discord-rpc": "^4.0.1",
@@ -19,6 +19,25 @@
   "build": {
     "appId": "com.viewcord.app",
     "productName": "ViewCord",
+    "copyright": "Copyright © 2026 ViewCord",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "renderer.js",
+      "styles.css",
+      "assets/**/*",
+      "node_modules/discord-rpc/**/*",
+      "node_modules/peerjs/**/*",
+      "!node_modules/**/*/{CHANGELOG,CHANGES,HISTORY,README,readme,*.md,*.map,*.ts,*.tsx,*.flow}",
+      "!**/{test,tests,__tests__,docs,doc,examples,example,samples}/**"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "buildDependenciesFromSource": false,
     "protocols": [
       {
         "name": "ViewCord",
@@ -29,13 +48,24 @@
     ],
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "assets/icon.ico"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ViewCord",
+      "artifactName": "ViewCord-Setup-${version}.exe"
     }
   }
 }
