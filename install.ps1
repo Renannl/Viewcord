@@ -19,7 +19,8 @@ if (-not $asset) {
 
 Write-Host "Arquivo encontrado: $($asset.name)"
 
-$installerPath = [System.IO.Path]::Combine($env:TEMP, $asset.name)
+$tempDir = [System.IO.Path]::GetFullPath($env:TEMP)
+$installerPath = Join-Path -Path $tempDir -ChildPath $asset.name
 
 Write-Host "Baixando instalador..."
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installerPath
@@ -29,6 +30,16 @@ Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
 
 if (Test-Path -LiteralPath $installerPath) {
     Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
+}
+
+$appPath = "$env:LOCALAPPDATA\Programs\ViewCord\ViewCord.exe"
+if (Test-Path -LiteralPath $appPath) {
+    Write-Host "Abrindo ViewCord na bandeja..."
+    Start-Process -FilePath $appPath -ArgumentList "--hidden"
+} else {
+    Write-Host "ViewCord.exe nao encontrado em $appPath"
+    Write-Host "Listando conteudo da pasta de instalacao..."
+    Get-ChildItem -Path "$env:LOCALAPPDATA\Programs\ViewCord" -ErrorAction SilentlyContinue
 }
 
 Write-Host "Viewcord instalado com sucesso!"

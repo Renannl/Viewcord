@@ -59,6 +59,7 @@
     },
     "nsis": {
       "oneClick": true,
+      "runAfterFinish": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
       "deleteAppDataOnUninstall": false,
