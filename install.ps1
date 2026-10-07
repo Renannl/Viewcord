@@ -3,7 +3,7 @@
 $ErrorActionPreference = "Stop"
 $repository = "Renannl/Viewcord"
 
-Write-Host "Buscando a versão mais recente do ViewCord..."
+Write-Host "Buscando a versao mais recente do Viewcord..."
 
 $release = Invoke-RestMethod `
   -Uri "https://api.github.com/repos/$repository/releases/latest" `
@@ -24,11 +24,11 @@ $installerPath = [System.IO.Path]::Combine($env:TEMP, $asset.name)
 Write-Host "Baixando instalador..."
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installerPath
 
-Write-Host "Instalando silenciosamente..."
+Write-Host "Instalando..."
 Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
 
 if (Test-Path -LiteralPath $installerPath) {
     Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "ViewCord instalado com sucesso!"
+Write-Host "Viewcord instalado com sucesso!"
