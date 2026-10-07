@@ -25,6 +25,8 @@
     },
     "files": [
       "main.js",
+      "discord.js",
+      "peer.js",
       "preload.js",
       "index.html",
       "renderer.js",
@@ -36,8 +38,8 @@
       "!**/{test,tests,__tests__,docs,doc,examples,example,samples}/**"
     ],
     "asar": true,
-    "npmRebuild": false,
-    "buildDependenciesFromSource": false,
+    "npmRebuild": true,
+    "buildDependenciesFromSource": true,
     "protocols": [
       {
         "name": "Viewcord",
