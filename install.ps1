@@ -2,7 +2,7 @@
 
 $ErrorActionPreference = "Stop"
 $repository = "Renannl/Viewcord"
-$installerName = "ViewCord-Setup-0.1.0.exe"
+$installerName = "ViewCord.Setup.0.1.0.exe"
 
 Write-Host "Buscando a versão mais recente do ViewCord..."
 
