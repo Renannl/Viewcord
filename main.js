@@ -11,12 +11,12 @@ const {
 const path = require("path");
 const { ensureConnected, updatePresence, stopPresence } = require("./discord");
 
-let mainWindow;
-
 const APP_ICON = path.join(__dirname, "assets", "icon.png");
 const TRAY_ICON = path.join(__dirname, "assets", "tray.png");
 const START_HIDDEN = process.argv.includes("--hidden");
 
+let mainWindow;
+let pendingDeepLink = null;
 let tray = null;
 let isQuitting = false;
 
@@ -40,12 +40,21 @@ if (!gotLock) {
 
     const url = commandLine.find((arg) => arg.startsWith("viewcord://"));
     if (url && mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-      handleDeepLink(url);
+      focusWindow();
+      if (mainWindow.webContents.isLoading()) {
+        pendingDeepLink = url;
+      } else {
+        handleDeepLink(url);
+      }
     }
   });
+}
+
+function focusWindow() {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 function createTray() {
@@ -128,15 +137,34 @@ app.whenReady().then(async () => {
 
   const initialUrl = process.argv.find((arg) => arg.startsWith("viewcord://"));
   if (initialUrl) {
-    console.log("URL inicial:", initialUrl);
-    setTimeout(() => handleDeepLink(initialUrl), 1000);
+    console.log("URL inicial (pendente):", initialUrl);
+    pendingDeepLink = initialUrl;
   }
 });
 
 app.on("open-url", (event, url) => {
   event.preventDefault();
   console.log("open-url (macOS):", url);
-  handleDeepLink(url);
+
+  if (!mainWindow) {
+    pendingDeepLink = url;
+    return;
+  }
+
+  focusWindow();
+  if (mainWindow.webContents.isLoading()) {
+    pendingDeepLink = url;
+  } else {
+    handleDeepLink(url);
+  }
+});
+
+ipcMain.on("renderer-ready", () => {
+  console.log("Renderer pronto. Processando deep link pendente...");
+  if (pendingDeepLink && mainWindow) {
+    handleDeepLink(pendingDeepLink);
+    pendingDeepLink = null;
+  }
 });
 
 app.on("before-quit", () => {

@@ -12,6 +12,7 @@ let peer = null;
 let currentCall = null;
 let currentStream = null;
 let peerReady = false;
+let pendingDeepLinkRoom = null;
 
 function showScreen(name) {
   Object.values(screens).forEach((s) => s.classList.add("hidden"));
@@ -68,6 +69,21 @@ function initPeer() {
         }
 
         currentCall = peer.call(conn.peer, currentStream);
+
+        currentCall.on("error", (err) => {
+          console.error("Erro na call (host):", err);
+          showToast("Erro na transmissão. Encerrando...", "error");
+          stopShare();
+        });
+
+        currentCall.on("close", () => {
+          console.log("Call fechada (host)");
+          currentCall = null;
+        });
+      });
+
+      conn.on("error", (err) => {
+        console.error("Erro na conexão de dados:", err);
       });
     });
 
@@ -82,6 +98,13 @@ function initPeer() {
     peer.on("error", (err) => {
       console.error("❌ Erro P2P:", err);
       statusEl.textContent = "❌ Erro P2P: " + err.message;
+
+      if (err.type === "network" || err.type === "server-error") {
+        showToast("Conexão perdida. Tentando reconectar...", "warning");
+      } else if (err.type === "peer-unavailable") {
+        showToast("Sala não encontrada ou offline.", "error");
+      }
+
       reject(err);
     });
 
@@ -102,10 +125,23 @@ function initPeer() {
         };
       });
 
-      call.on("negotiationneeded", () => {
-        console.log("Renegociando...");
-        call.pause();
-        setTimeout(() => call.resume(), 100);
+      call.on("error", (err) => {
+        console.error("Erro na call (viewer):", err);
+        showToast("Erro na conexão. Voltando ao início...", "error");
+        if (currentCall) {
+          currentCall.close();
+          currentCall = null;
+        }
+        showScreen("idle");
+        statusEl.textContent = "⚪ Parado";
+      });
+
+      call.on("close", () => {
+        console.log("Call fechada (viewer)");
+        currentCall = null;
+        showScreen("idle");
+        statusEl.textContent = "⚪ Parado";
+        showToast("Transmissão encerrada.", "info");
       });
 
       currentCall = call;
@@ -222,15 +258,41 @@ async function stopShare() {
   statusEl.textContent = "⚪ Parado";
 }
 
-async function joinRoom(roomId) {
-  const conn = peer.connect(roomId);
-  conn.on("open", () => {
-    console.log("✅ Conectado na sala:", roomId);
+function joinRoom(roomId) {
+  return new Promise((resolve, reject) => {
+    const conn = peer.connect(roomId, { reliable: true });
+
+    const timeout = setTimeout(() => {
+      reject(new Error("Tempo esgotado ao conectar na sala."));
+    }, 10000);
+
+    conn.on("open", () => {
+      clearTimeout(timeout);
+      console.log("✅ Conectado na sala:", roomId);
+      resolve();
+    });
+
+    conn.on("error", (err) => {
+      clearTimeout(timeout);
+      console.error("Erro ao conectar:", err);
+      reject(err);
+    });
   });
-  conn.on("error", (err) => {
-    console.error("Erro ao conectar:", err);
-    statusEl.textContent = "❌ Sala não encontrada";
-  });
+}
+
+function handleDeepLinkRoom(roomId) {
+  if (currentStream) {
+    showToast("Você já está compartilhando. Pare primeiro.", "warning");
+    return;
+  }
+
+  if (roomId === peer.id) {
+    showToast("Você não pode assistir à própria transmissão.", "error");
+    return;
+  }
+
+  document.getElementById("room-input").value = roomId;
+  document.getElementById("btn-join").click();
 }
 
 btnStart.addEventListener("click", async () => {
@@ -301,21 +363,25 @@ document.getElementById("btn-copy").addEventListener("click", () => {
 });
 
 window.viewcord.onDeepLink((roomId) => {
-  if (currentStream) {
-    showToast("Você já está compartilhando. Pare primeiro.", "warning");
+  if (!peerReady) {
+    console.log("Peer ainda não pronto, guardando deep link:", roomId);
+    pendingDeepLinkRoom = roomId;
     return;
   }
 
-  if (roomId === peer.id) {
-    showToast("Você não pode assistir à própria transmissão.", "error");
-    return;
-  }
-
-  document.getElementById("room-input").value = roomId;
-  document.getElementById("btn-join").click();
+  handleDeepLinkRoom(roomId);
 });
 
 btnStart.disabled = true;
 statusEl.textContent = "🟡 Conectando P2P...";
 
-initPeer().catch(console.error);
+initPeer()
+  .then(() => {
+    window.electronAPI.send("renderer-ready");
+
+    if (pendingDeepLinkRoom) {
+      handleDeepLinkRoom(pendingDeepLinkRoom);
+      pendingDeepLinkRoom = null;
+    }
+  })
+  .catch(console.error);
