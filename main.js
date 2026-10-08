@@ -38,16 +38,29 @@ if (!gotLock) {
     console.log("Segunda instância detectada");
     console.log("commandLine:", commandLine);
 
-    const url = commandLine.find((arg) => arg.startsWith("viewcord://"));
-    if (url && mainWindow) {
+    const url = extractDeepLink(commandLine);
+    if (!url) return;
+
+    if (mainWindow) {
       focusWindow();
       if (mainWindow.webContents.isLoading()) {
         pendingDeepLink = url;
       } else {
         handleDeepLink(url);
       }
+    } else {
+      pendingDeepLink = url;
     }
   });
+}
+
+function extractDeepLink(args) {
+  if (!args || !Array.isArray(args)) return null;
+  return (
+    args.find(
+      (arg) => typeof arg === "string" && arg.startsWith("viewcord://"),
+    ) || null
+  );
 }
 
 function focusWindow() {
@@ -108,6 +121,14 @@ function createWindow() {
 
   mainWindow.loadFile("index.html");
 
+  mainWindow.webContents.on("did-finish-load", () => {
+    console.log("did-finish-load. pendingDeepLink:", pendingDeepLink);
+    if (pendingDeepLink && mainWindow) {
+      handleDeepLink(pendingDeepLink);
+      pendingDeepLink = null;
+    }
+  });
+
   mainWindow.once("ready-to-show", () => {
     if (!START_HIDDEN) {
       mainWindow.show();
@@ -135,10 +156,12 @@ app.whenReady().then(async () => {
     args: ["--hidden"],
   });
 
-  const initialUrl = process.argv.find((arg) => arg.startsWith("viewcord://"));
+  const initialUrl = extractDeepLink(process.argv);
   if (initialUrl) {
-    console.log("URL inicial (pendente):", initialUrl);
+    console.log("URL inicial encontrada:", initialUrl);
     pendingDeepLink = initialUrl;
+  } else {
+    console.log("Nenhuma URL inicial encontrada em:", process.argv);
   }
 });
 

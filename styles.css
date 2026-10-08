@@ -498,7 +498,7 @@ h2 {
 
 .toast-container {
   position: fixed;
-  top: 20px;
+  top: 52px;
   right: 20px;
   z-index: 9999;
   display: flex;

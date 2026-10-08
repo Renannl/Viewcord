@@ -372,13 +372,13 @@ window.viewcord.onDeepLink((roomId) => {
   handleDeepLinkRoom(roomId);
 });
 
+window.viewcord.send("renderer-ready");
+
 btnStart.disabled = true;
 statusEl.textContent = "🟡 Conectando P2P...";
 
 initPeer()
   .then(() => {
-    window.electronAPI.send("renderer-ready");
-
     if (pendingDeepLinkRoom) {
       handleDeepLinkRoom(pendingDeepLinkRoom);
       pendingDeepLinkRoom = null;
