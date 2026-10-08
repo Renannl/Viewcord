@@ -18,6 +18,30 @@ function showScreen(name) {
   screens[name].classList.remove("hidden");
 }
 
+function showToast(message, type = "info", duration = 3500) {
+  const container = document.getElementById("toast-container");
+
+  const icons = {
+    error: "⚠️",
+    success: "✅",
+    info: "ℹ️",
+  };
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || icons.info}</span>
+    <span>${message}</span>
+  `;
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add("toast-out");
+    toast.addEventListener("animationend", () => toast.remove());
+  }, duration);
+}
+
 function initPeer() {
   return new Promise((resolve, reject) => {
     peer = new Peer({
@@ -31,7 +55,7 @@ function initPeer() {
     });
 
     peer.on("open", (id) => {
-      console.log("🆔 Meu ID P2P:", id);
+      console.log("Meu ID P2P:", id);
       peerReady = true;
       btnStart.disabled = false;
       statusEl.textContent = "🟢 Conectado P2P — pronto pra compartilhar";
@@ -182,17 +206,28 @@ async function joinRoom(roomId) {
   });
 }
 
-// Event listeners
 btnStart.addEventListener("click", async () => {
+  const result = await window.viewcord.ensureDiscord();
+  if (!result.ok) {
+    showToast("Abra o Discord primeiro e tente novamente.", "error");
+    return;
+  }
+
   try {
-    statusEl.textContent = "🟡 Escolhendo tela...";
+    showToast("Escolhendo tela...", "info", 2000);
     const roomId = await startShare();
     document.getElementById("room-id").textContent = roomId;
-    await window.viewcord.updateRoom(roomId);
+
+    const update = await window.viewcord.updateRoom(roomId);
+    if (!update.ok) {
+      showToast(update.message, "error");
+      return;
+    }
+
     showScreen("sharing");
-    statusEl.textContent = "🟢 Ao vivo";
+    showToast("Ao vivo!", "success");
   } catch (err) {
-    statusEl.textContent = "❌ " + err.message;
+    showToast(err.message, "error");
   }
 });
 
@@ -221,35 +256,31 @@ document
 document.getElementById("btn-join").addEventListener("click", async () => {
   const roomId = document.getElementById("room-input").value.trim();
   if (!roomId) return;
+
   try {
-    statusEl.textContent = "🟡 Conectando...";
+    showToast("Conectando...", "info", 2000);
     await joinRoom(roomId);
     showScreen("watching");
-    statusEl.textContent = "🟢 Assistindo";
+    showToast("Assistindo", "success");
   } catch (err) {
-    statusEl.textContent = "❌ " + err.message;
+    showToast(err.message, "error");
   }
 });
 
 document.getElementById("btn-copy").addEventListener("click", () => {
   const id = document.getElementById("room-id").textContent;
   navigator.clipboard.writeText(id);
-  document.getElementById("btn-copy").textContent = "✅";
-  setTimeout(() => {
-    document.getElementById("btn-copy").textContent = "📋";
-  }, 1500);
+  showToast("ID copiado!", "success", 1500);
 });
 
 window.viewcord.onDeepLink((roomId) => {
   if (currentStream) {
-    console.warn("⚠️ Já está compartilhando. Ignorando deep link.");
-    statusEl.textContent = "⚠️ Você já está compartilhando. Pare primeiro.";
+    showToast("Você já está compartilhando. Pare primeiro.", "warning");
     return;
   }
 
   if (roomId === peer.id) {
-    console.warn("⚠️ Tentando entrar na própria sala.");
-    statusEl.textContent = "⚠️ Você não pode assistir à própria transmissão.";
+    showToast("Você não pode assistir à própria transmissão.", "error");
     return;
   }
 

@@ -2,21 +2,47 @@ const DiscordRPC = require("discord-rpc");
 
 const CLIENT_ID = "798971988722450442";
 
-const rpc = new DiscordRPC.Client({ transport: "ipc" });
+let rpc = null;
 let connected = false;
+let currentRoomId = null;
 
-async function initDiscordRPC() {
-  rpc.on("ready", () => {
-    connected = true;
-    console.log("Conectado ao Discord RPC");
-    updatePresence(null);
+async function connect() {
+  if (connected && rpc) return true;
+
+  return new Promise((resolve, reject) => {
+    rpc = new DiscordRPC.Client({ transport: "ipc" });
+
+    rpc.once("ready", () => {
+      connected = true;
+      console.log("Discord RPC conectado");
+      updatePresence(currentRoomId);
+      resolve(true);
+    });
+
+    rpc.on("disconnected", () => {
+      console.log("Discord RPC desconectado");
+      connected = false;
+      rpc = null;
+    });
+
+    rpc.login({ clientId: CLIENT_ID }).catch((err) => {
+      console.log("Falha ao conectar Discord RPC:", err.message);
+      connected = false;
+      rpc = null;
+      reject(new Error("Discord não está aberto ou não pôde ser conectado."));
+    });
   });
+}
 
-  await rpc.login({ clientId: CLIENT_ID });
+async function ensureConnected() {
+  if (connected && rpc) return true;
+  await connect();
 }
 
 function updatePresence(roomId) {
-  if (!connected) return;
+  currentRoomId = roomId || null;
+
+  if (!connected || !rpc) return;
 
   const activity = {
     details: roomId ? "Compartilhando tela" : "Aguardando",
@@ -36,13 +62,17 @@ function updatePresence(roomId) {
     ];
   }
 
-  rpc.setActivity(activity).catch(console.error);
+  rpc.setActivity(activity).catch((err) => {
+    console.error("Erro ao setar presence:", err.message);
+  });
 }
 
 function stopPresence() {
-  if (connected) {
+  if (rpc) {
     rpc.destroy().catch(() => {});
+    rpc = null;
   }
+  connected = false;
 }
 
-module.exports = { initDiscordRPC, updatePresence, stopPresence };
+module.exports = { ensureConnected, updatePresence, stopPresence };

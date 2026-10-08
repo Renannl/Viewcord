@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("viewcord", {
   updateRoom: (roomId) => ipcRenderer.invoke("update-room", roomId),
   clearRoom: () => ipcRenderer.invoke("clear-room"),
   getSources: () => ipcRenderer.invoke("get-sources"),
+  ensureDiscord: () => ipcRenderer.invoke("ensure-discord"),
   onDeepLink: (callback) => {
     ipcRenderer.on("deep-link", (event, roomId) => callback(roomId));
   },

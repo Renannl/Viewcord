@@ -9,7 +9,7 @@ const {
   nativeImage,
 } = require("electron");
 const path = require("path");
-const { initDiscordRPC, updatePresence, stopPresence } = require("./discord");
+const { ensureConnected, updatePresence, stopPresence } = require("./discord");
 
 let mainWindow;
 let currentRoomId = null;
@@ -129,13 +129,6 @@ app.whenReady().then(async () => {
     args: ["--hidden"],
   });
 
-  try {
-    await initDiscordRPC();
-    console.log("Discord RPC inicializado");
-  } catch (err) {
-    console.log("Discord RPC não conectado:", err.message);
-  }
-
   const initialUrl = process.argv.find((arg) => arg.startsWith("viewcord://"));
   if (initialUrl) {
     console.log("URL inicial:", initialUrl);
@@ -170,11 +163,25 @@ function handleDeepLink(url) {
   }
 }
 
-ipcMain.handle("update-room", (event, roomId) => {
-  console.log("Room atualizada:", roomId);
+ipcMain.handle("ensure-discord", async () => {
+  try {
+    await ensureConnected();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  }
+});
+
+ipcMain.handle("update-room", async (event, roomId) => {
+  try {
+    await ensureConnected();
+  } catch (err) {
+    return { ok: false, message: "Abra o Discord primeiro e tente novamente." };
+  }
+
   currentRoomId = roomId;
   updatePresence(roomId);
-  return true;
+  return { ok: true };
 });
 
 ipcMain.handle("clear-room", () => {
