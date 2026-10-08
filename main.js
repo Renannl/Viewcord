@@ -12,7 +12,6 @@ const path = require("path");
 const { ensureConnected, updatePresence, stopPresence } = require("./discord");
 
 let mainWindow;
-let currentRoomId = null;
 
 const APP_ICON = path.join(__dirname, "assets", "icon.png");
 const TRAY_ICON = path.join(__dirname, "assets", "tray.png");
@@ -25,8 +24,6 @@ protocol.registerSchemesAsPrivileged([
   { scheme: "viewcord", privileges: { standard: true, secure: true } },
 ]);
 
-// No desenvolvimento, precisa informar a pasta do app
-// No app empacotado, o executável já sabe onde está
 if (app.isPackaged) {
   app.setAsDefaultProtocolClient("viewcord");
 } else {
@@ -144,6 +141,7 @@ app.on("open-url", (event, url) => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  stopPresence();
 });
 
 function handleDeepLink(url) {
@@ -179,13 +177,11 @@ ipcMain.handle("update-room", async (event, roomId) => {
     return { ok: false, message: "Abra o Discord primeiro e tente novamente." };
   }
 
-  currentRoomId = roomId;
   updatePresence(roomId);
   return { ok: true };
 });
 
 ipcMain.handle("clear-room", () => {
-  currentRoomId = null;
   updatePresence(null);
   return true;
 });
@@ -212,9 +208,5 @@ ipcMain.on("window-close", () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin" && !isQuitting) {
-  } else {
-    stopPresence();
-    app.quit();
-  }
+  // App continua rodando na bandeja;
 });

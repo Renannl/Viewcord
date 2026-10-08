@@ -25,6 +25,7 @@ function showToast(message, type = "info", duration = 3500) {
     error: "⚠️",
     success: "✅",
     info: "ℹ️",
+    warning: "⚠️",
   };
 
   const toast = document.createElement("div");
@@ -54,6 +55,22 @@ function initPeer() {
       },
     });
 
+    peer.on("connection", (conn) => {
+      conn.on("open", async () => {
+        if (!currentStream) return;
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        const videoTrack = currentStream.getVideoTracks()[0];
+        if (!videoTrack || videoTrack.readyState !== "live") {
+          console.warn("Stream não está ativa, não iniciando call");
+          return;
+        }
+
+        currentCall = peer.call(conn.peer, currentStream);
+      });
+    });
+
     peer.on("open", (id) => {
       console.log("Meu ID P2P:", id);
       peerReady = true;
@@ -70,11 +87,27 @@ function initPeer() {
 
     peer.on("call", (call) => {
       call.answer();
+
       call.on("stream", (remoteStream) => {
         const video = document.getElementById("remote-video");
         video.srcObject = remoteStream;
-        showScreen("watching");
+
+        video.onloadedmetadata = () => {
+          video
+            .play()
+            .then(() => {
+              showScreen("watching");
+            })
+            .catch(() => showScreen("watching"));
+        };
       });
+
+      call.on("negotiationneeded", () => {
+        console.log("Renegociando...");
+        call.pause();
+        setTimeout(() => call.resume(), 100);
+      });
+
       currentCall = call;
     });
   });
@@ -167,12 +200,6 @@ async function startShare() {
 
   currentStream = stream;
   const roomId = peer.id;
-
-  peer.on("connection", (conn) => {
-    conn.on("open", () => {
-      currentCall = peer.call(conn.peer, stream);
-    });
-  });
 
   stream.getVideoTracks()[0].onended = () => {
     stopShare();
