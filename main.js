@@ -120,6 +120,8 @@ function createWindow() {
     },
   });
 
+  mainWindow.webContents.openDevTools();
+
   mainWindow.loadFile("index.html");
 
   mainWindow.webContents.on("did-finish-load", () => {

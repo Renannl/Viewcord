@@ -15,6 +15,7 @@ let currentStream = null;
 let peerReady = false;
 let pendingDeepLinkRoom = null;
 let peerConnecting = false;
+let globalCallListenerSet = false;
 
 function showScreen(name) {
   Object.values(screens).forEach((s) => s.classList.add("hidden"));
@@ -61,8 +62,18 @@ function destroyPeer() {
   peer = null;
   peerReady = false;
   peerConnecting = false;
-  btnStart.disabled = true;
+  globalCallListenerSet = false;
   setStatus("⚪ Ocioso — clique em Compartilhar ou Assistir para conectar");
+}
+
+function setupGlobalCallListener() {
+  if (globalCallListenerSet) return;
+  globalCallListenerSet = true;
+
+  peer.on("call", (call) => {
+    console.log("Call recebida de:", call.peer);
+    answerCall(call);
+  });
 }
 
 function initPeer() {
@@ -96,30 +107,34 @@ function initPeer() {
       },
     });
 
+    // ------------- HOST: recebe conexão de dados e inicia a call -------------
     peer.on("connection", (conn) => {
-      conn.on("open", async () => {
-        if (!currentStream) return;
+      conn.on("open", () => {
+        console.log("Conexão de dados aberta com:", conn.peer);
+      });
 
-        await new Promise((resolve) => setTimeout(resolve, 500));
+      conn.on("data", (data) => {
+        if (data === "viewer-ready" && currentStream) {
+          console.log("Viewer pronto. Iniciando call...");
+          const videoTrack = currentStream.getVideoTracks()[0];
+          if (!videoTrack || videoTrack.readyState !== "live") {
+            console.warn("Stream não está ativa, não iniciando call");
+            return;
+          }
 
-        const videoTrack = currentStream.getVideoTracks()[0];
-        if (!videoTrack || videoTrack.readyState !== "live") {
-          console.warn("Stream não está ativa, não iniciando call");
-          return;
+          currentCall = peer.call(conn.peer, currentStream);
+
+          currentCall.on("error", (err) => {
+            console.error("Erro na call (host):", err);
+            showToast("Erro na transmissão. Encerrando...", "error");
+            stopShare();
+          });
+
+          currentCall.on("close", () => {
+            console.log("Call fechada (host)");
+            currentCall = null;
+          });
         }
-
-        currentCall = peer.call(conn.peer, currentStream);
-
-        currentCall.on("error", (err) => {
-          console.error("Erro na call (host):", err);
-          showToast("Erro na transmissão. Encerrando...", "error");
-          stopShare();
-        });
-
-        currentCall.on("close", () => {
-          console.log("Call fechada (host)");
-          currentCall = null;
-        });
       });
 
       conn.on("error", (err) => {
@@ -133,6 +148,16 @@ function initPeer() {
       peerConnecting = false;
       btnStart.disabled = false;
       setStatus("🟢 Conectado P2P — pronto pra compartilhar");
+
+      setupGlobalCallListener();
+
+      if (pendingDeepLinkRoom) {
+        console.log("Processando deep link pendente:", pendingDeepLinkRoom);
+        const roomId = pendingDeepLinkRoom;
+        pendingDeepLinkRoom = null;
+        handleDeepLinkRoom(roomId);
+      }
+
       resolve(id);
     });
 
@@ -148,44 +173,6 @@ function initPeer() {
       }
 
       reject(err);
-    });
-
-    peer.on("call", (call) => {
-      call.answer();
-
-      call.on("stream", (remoteStream) => {
-        const video = document.getElementById("remote-video");
-        video.srcObject = remoteStream;
-
-        video.onloadedmetadata = () => {
-          video
-            .play()
-            .then(() => {
-              showScreen("watching");
-            })
-            .catch(() => showScreen("watching"));
-        };
-      });
-
-      call.on("error", (err) => {
-        console.error("Erro na call (viewer):", err);
-        showToast("Erro na conexão. Voltando ao início...", "error");
-        if (currentCall) {
-          currentCall.close();
-          currentCall = null;
-        }
-        showScreen("idle");
-        destroyPeer();
-      });
-
-      call.on("close", () => {
-        console.log("Call fechada (viewer)");
-        currentCall = null;
-        showScreen("idle");
-        destroyPeer();
-      });
-
-      currentCall = call;
     });
   });
 }
@@ -294,7 +281,7 @@ async function startShare() {
   } catch (err) {
     if (captureAudio) {
       showToast(
-        "Não foi possível capturar o áudio. Tentando sem áudio...",
+        "Não foi possível capturar o áudio da janela. Tentando sem áudio...",
         "warning",
       );
       stream = await navigator.mediaDevices.getUserMedia({
@@ -306,12 +293,41 @@ async function startShare() {
     }
   }
 
+  // Se pediu áudio, mas nenhuma faixa veio, tenta capturar o áudio do sistema (tela inteira)
+  if (captureAudio && stream.getAudioTracks().length === 0) {
+    try {
+      const audioStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          mandatory: {
+            chromeMediaSource: "desktop",
+          },
+        },
+        video: false,
+      });
+
+      const audioTrack = audioStream.getAudioTracks()[0];
+      if (audioTrack) {
+        stream.addTrack(audioTrack);
+        showToast("Áudio do sistema capturado", "success", 2000);
+      }
+    } catch (err) {
+      console.warn("Não foi possível capturar áudio do sistema:", err);
+      showToast(
+        "Áudio indisponível para essa fonte. Compartilhe a tela inteira para ter som.",
+        "warning",
+        4000,
+      );
+    }
+  }
+
   currentStream = stream;
   const roomId = peer.id;
 
   const audioTrack = stream.getAudioTracks()[0];
   if (audioTrack) {
     showToast(`Áudio: ${audioTrack.label || "ativo"}`, "success", 2000);
+  } else if (captureAudio) {
+    showToast("Áudio não disponível para esta fonte.", "warning", 4000);
   }
 
   stream.getVideoTracks()[0].onended = () => {
@@ -319,6 +335,28 @@ async function startShare() {
   };
 
   return roomId;
+}
+
+function showUnmuteOverlay() {
+  const existing = document.getElementById("unmute-overlay");
+  if (existing) return;
+
+  const wrapper = document.querySelector(".video-wrapper");
+  if (!wrapper) return;
+
+  const overlay = document.createElement("div");
+  overlay.id = "unmute-overlay";
+  overlay.className = "unmute-overlay";
+  overlay.innerHTML = "🔊 Clique para ativar o som";
+
+  overlay.addEventListener("click", () => {
+    const video = document.getElementById("remote-video");
+    video.muted = false;
+    video.play().catch((e) => console.error("Erro ao ativar som:", e));
+    overlay.remove();
+  });
+
+  wrapper.appendChild(overlay);
 }
 
 async function stopShare() {
@@ -336,16 +374,18 @@ async function stopShare() {
 }
 
 async function joinRoom(roomId) {
-  const conn = peer.connect(roomId, { reliable: true });
-
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error("Tempo esgotado ao conectar na sala."));
     }, 10000);
 
+    const conn = peer.connect(roomId, { reliable: true });
+
     conn.on("open", () => {
       clearTimeout(timeout);
       console.log("✅ Conectado na sala:", roomId);
+      // Avisa o host que o viewer está pronto para receber a call
+      conn.send("viewer-ready");
       resolve();
     });
 
@@ -355,6 +395,59 @@ async function joinRoom(roomId) {
       reject(err);
     });
   });
+}
+
+function answerCall(call) {
+  console.log("answerCall iniciado");
+  call.answer();
+
+  call.on("stream", (remoteStream) => {
+    console.log("Stream remoto recebido:", remoteStream);
+    console.log("Áudio tracks:", remoteStream.getAudioTracks());
+
+    const video = document.getElementById("remote-video");
+    video.srcObject = remoteStream;
+    video.muted = false;
+
+    video.onloadedmetadata = () => {
+      video
+        .play()
+        .then(() => {
+          console.log("Vídeo tocando com áudio");
+          showScreen("watching");
+        })
+        .catch((err) => {
+          console.error("Erro ao dar play:", err);
+          // Se o navegador bloquear áudio, tenta mudo e oferece botão para ativar
+          video.muted = true;
+          video.play().then(() => {
+            console.log("Vídeo tocando mudo — aguardando interação");
+            showUnmuteOverlay();
+          });
+          showScreen("watching");
+        });
+    };
+  });
+
+  call.on("error", (err) => {
+    console.error("Erro na call (viewer):", err);
+    showToast("Erro na conexão. Voltando ao início...", "error");
+    if (currentCall) {
+      currentCall.close();
+      currentCall = null;
+    }
+    showScreen("idle");
+    destroyPeer();
+  });
+
+  call.on("close", () => {
+    console.log("Call fechada (viewer)");
+    currentCall = null;
+    showScreen("idle");
+    destroyPeer();
+  });
+
+  currentCall = call;
 }
 
 async function handleDeepLinkRoom(roomId) {
@@ -371,14 +464,20 @@ async function handleDeepLinkRoom(roomId) {
       return;
     }
 
-    document.getElementById("room-input").value = roomId;
-    document.getElementById("btn-join").click();
+    showToast("Entrando na sala...", "info", 2000);
+    await joinRoom(roomId);
+    showToast("Assistindo", "success");
   } catch (err) {
     showToast(err.message || "Erro ao conectar. Tente novamente.", "error");
   }
 }
 
 btnStart.addEventListener("click", async () => {
+  if (!peerReady || !peer) {
+    await destroyPeer();
+    await ensurePeer();
+  }
+
   const result = await window.viewcord.ensureDiscord();
   if (!result.ok) {
     showToast("Abra o Discord primeiro e tente novamente.", "error");
@@ -386,7 +485,6 @@ btnStart.addEventListener("click", async () => {
   }
 
   try {
-    await ensurePeer();
     showToast("Escolhendo tela...", "info", 2000);
     const roomId = await startShare();
     document.getElementById("room-id").textContent = roomId;
@@ -434,7 +532,7 @@ document.getElementById("btn-join").addEventListener("click", async () => {
     await ensurePeer();
     showToast("Conectando...", "info", 2000);
     await joinRoom(roomId);
-    showScreen("watching");
+    // A tela muda em answerCall quando o stream chegar
     showToast("Assistindo", "success");
   } catch (err) {
     showToast(err.message || "Erro ao entrar na sala.", "error");
