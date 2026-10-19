@@ -36,11 +36,16 @@ if (!gotLock) {
   app.quit();
 } else {
   app.on("second-instance", (event, commandLine, workingDirectory) => {
-    console.log("Segunda instância detectada");
+    console.log(" Segunda instância detectada");
     console.log("commandLine:", commandLine);
 
     const url = extractDeepLink(commandLine);
-    if (!url) return;
+    console.log("URL extraída:", url);
+
+    if (!url) {
+      console.log("❌ Nenhuma URL válida encontrada");
+      return;
+    }
 
     focusWindow();
     queueDeepLink(url);
@@ -49,11 +54,19 @@ if (!gotLock) {
 
 function extractDeepLink(args) {
   if (!args || !Array.isArray(args)) return null;
-  return (
-    args.find(
-      (arg) => typeof arg === "string" && arg.startsWith("viewcord://"),
-    ) || null
-  );
+  console.log("Extraindo deep link de:", args);
+
+  const raw = args.find((arg) => {
+    if (typeof arg !== "string") return false;
+    const clean = arg.trim().replace(/^["']|["']$/g, "");
+    return clean.startsWith("viewcord://");
+  });
+
+  if (!raw) return null;
+
+  const cleaned = raw.trim().replace(/^["']|["']$/g, "");
+  console.log("Deep link encontrado:", cleaned);
+  return cleaned;
 }
 
 function focusWindow() {
@@ -64,21 +77,35 @@ function focusWindow() {
 }
 
 function queueDeepLink(url) {
+  console.log("queueDeepLink chamado com:", url);
   pendingDeepLink = url;
+
+  console.log(
+    "rendererReady:",
+    rendererReady,
+    "mainWindow existe:",
+    !!mainWindow,
+  );
 
   if (rendererReady && mainWindow) {
     sendDeepLinkToRenderer();
+  } else {
+    console.log("Aguardando renderer ficar pronto...");
   }
 }
 
 function sendDeepLinkToRenderer() {
+  console.log("sendDeepLinkToRenderer chamado. pending:", pendingDeepLink);
   if (!pendingDeepLink || !mainWindow) return;
 
-  console.log("Enviando deep link para renderer:", pendingDeepLink);
   const match = pendingDeepLink.match(/room=([^&/?]+)/);
-  if (!match) return;
+  if (!match) {
+    console.log("Regex não encontrou room em:", pendingDeepLink);
+    return;
+  }
 
   const roomId = match[1];
+  console.log("Enviando roomId:", roomId);
   focusWindow();
   mainWindow.webContents.send("deep-link", roomId);
   pendingDeepLink = null;
@@ -181,12 +208,22 @@ app.on("open-url", (event, url) => {
 });
 
 ipcMain.on("renderer-ready", () => {
-  console.log("Renderer pronto.");
+  console.log("🟢 Renderer pronto.");
   rendererReady = true;
+});
 
-  if (pendingDeepLink && mainWindow) {
-    sendDeepLinkToRenderer();
-  }
+ipcMain.handle("get-pending-deep-link", () => {
+  console.log("🔄 get-pending-deep-link chamado");
+  console.log("pendingDeepLink:", pendingDeepLink);
+
+  if (!pendingDeepLink) return null;
+
+  const match = pendingDeepLink.match(/room=([^&/?]+)/);
+  const roomId = match ? match[1] : null;
+
+  console.log("Retornando roomId pendente:", roomId);
+  pendingDeepLink = null;
+  return roomId;
 });
 
 app.on("before-quit", () => {

@@ -505,7 +505,6 @@ document.getElementById("btn-join").addEventListener("click", async () => {
     await ensurePeer();
     showToast("Conectando...", "info", 2000);
     await joinRoom(roomId);
-    // A tela muda em answerCall quando o stream chegar
     showToast("Assistindo", "success");
   } catch (err) {
     showToast(err.message || "Erro ao entrar na sala.", "error");
@@ -519,15 +518,25 @@ document.getElementById("btn-copy").addEventListener("click", () => {
 });
 
 window.viewcord.onDeepLink((roomId) => {
-  if (!peerReady) {
-    console.log("Peer ainda não pronto, guardando deep link:", roomId);
-    pendingDeepLinkRoom = roomId;
-    return;
-  }
-
+  console.log("Deep link recebido no renderer (push):", roomId);
   handleDeepLinkRoom(roomId);
 });
 
+async function checkPendingDeepLink() {
+  console.log("Verificando deep link pendente...");
+  try {
+    const roomId = await window.viewcord.getPendingDeepLink();
+    console.log("Deep link pendente:", roomId);
+    if (roomId) {
+      handleDeepLinkRoom(roomId);
+    }
+  } catch (err) {
+    console.error("Erro ao verificar deep link pendente:", err);
+  }
+}
+
 window.viewcord.send("renderer-ready");
+
+checkPendingDeepLink();
 
 setStatus("⚪ Ocioso — clique em Compartilhar ou Assistir para conectar");
