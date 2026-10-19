@@ -19,6 +19,7 @@ let mainWindow;
 let pendingDeepLink = null;
 let tray = null;
 let isQuitting = false;
+let rendererReady = false;
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "viewcord", privileges: { standard: true, secure: true } },
@@ -41,16 +42,8 @@ if (!gotLock) {
     const url = extractDeepLink(commandLine);
     if (!url) return;
 
-    if (mainWindow) {
-      focusWindow();
-      if (mainWindow.webContents.isLoading()) {
-        pendingDeepLink = url;
-      } else {
-        handleDeepLink(url);
-      }
-    } else {
-      pendingDeepLink = url;
-    }
+    focusWindow();
+    queueDeepLink(url);
   });
 }
 
@@ -68,6 +61,27 @@ function focusWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+}
+
+function queueDeepLink(url) {
+  pendingDeepLink = url;
+
+  if (rendererReady && mainWindow) {
+    sendDeepLinkToRenderer();
+  }
+}
+
+function sendDeepLinkToRenderer() {
+  if (!pendingDeepLink || !mainWindow) return;
+
+  console.log("Enviando deep link para renderer:", pendingDeepLink);
+  const match = pendingDeepLink.match(/room=([^&/?]+)/);
+  if (!match) return;
+
+  const roomId = match[1];
+  focusWindow();
+  mainWindow.webContents.send("deep-link", roomId);
+  pendingDeepLink = null;
 }
 
 function createTray() {
@@ -120,17 +134,7 @@ function createWindow() {
     },
   });
 
-  mainWindow.webContents.openDevTools();
-
   mainWindow.loadFile("index.html");
-
-  mainWindow.webContents.on("did-finish-load", () => {
-    console.log("did-finish-load. pendingDeepLink:", pendingDeepLink);
-    if (pendingDeepLink && mainWindow) {
-      handleDeepLink(pendingDeepLink);
-      pendingDeepLink = null;
-    }
-  });
 
   mainWindow.once("ready-to-show", () => {
     if (!START_HIDDEN) {
@@ -147,6 +151,7 @@ function createWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+    rendererReady = false;
   });
 }
 
@@ -162,7 +167,7 @@ app.whenReady().then(async () => {
   const initialUrl = extractDeepLink(process.argv);
   if (initialUrl) {
     console.log("URL inicial encontrada:", initialUrl);
-    pendingDeepLink = initialUrl;
+    queueDeepLink(initialUrl);
   } else {
     console.log("Nenhuma URL inicial encontrada em:", process.argv);
   }
@@ -171,25 +176,16 @@ app.whenReady().then(async () => {
 app.on("open-url", (event, url) => {
   event.preventDefault();
   console.log("open-url (macOS):", url);
-
-  if (!mainWindow) {
-    pendingDeepLink = url;
-    return;
-  }
-
   focusWindow();
-  if (mainWindow.webContents.isLoading()) {
-    pendingDeepLink = url;
-  } else {
-    handleDeepLink(url);
-  }
+  queueDeepLink(url);
 });
 
 ipcMain.on("renderer-ready", () => {
-  console.log("Renderer pronto. Processando deep link pendente...");
+  console.log("Renderer pronto.");
+  rendererReady = true;
+
   if (pendingDeepLink && mainWindow) {
-    handleDeepLink(pendingDeepLink);
-    pendingDeepLink = null;
+    sendDeepLinkToRenderer();
   }
 });
 
@@ -197,23 +193,6 @@ app.on("before-quit", () => {
   isQuitting = true;
   stopPresence();
 });
-
-function handleDeepLink(url) {
-  if (!url) return;
-  console.log("Processando deep link:", url);
-
-  const match = url.match(/room=([^&/?]+)/);
-  if (match && mainWindow) {
-    const roomId = match[1];
-    console.log("Room ID extraído:", roomId);
-
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-
-    mainWindow.webContents.send("deep-link", roomId);
-  }
-}
 
 ipcMain.handle("ensure-discord", async () => {
   try {
@@ -261,6 +240,4 @@ ipcMain.on("window-close", () => {
   if (mainWindow) mainWindow.close();
 });
 
-app.on("window-all-closed", () => {
-  // App continua rodando na bandeja;
-});
+app.on("window-all-closed", () => {});

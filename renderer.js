@@ -293,33 +293,6 @@ async function startShare() {
     }
   }
 
-  // Se pediu áudio, mas nenhuma faixa veio, tenta capturar o áudio do sistema (tela inteira)
-  if (captureAudio && stream.getAudioTracks().length === 0) {
-    try {
-      const audioStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          mandatory: {
-            chromeMediaSource: "desktop",
-          },
-        },
-        video: false,
-      });
-
-      const audioTrack = audioStream.getAudioTracks()[0];
-      if (audioTrack) {
-        stream.addTrack(audioTrack);
-        showToast("Áudio do sistema capturado", "success", 2000);
-      }
-    } catch (err) {
-      console.warn("Não foi possível capturar áudio do sistema:", err);
-      showToast(
-        "Áudio indisponível para essa fonte. Compartilhe a tela inteira para ter som.",
-        "warning",
-        4000,
-      );
-    }
-  }
-
   currentStream = stream;
   const roomId = peer.id;
 
@@ -327,7 +300,11 @@ async function startShare() {
   if (audioTrack) {
     showToast(`Áudio: ${audioTrack.label || "ativo"}`, "success", 2000);
   } else if (captureAudio) {
-    showToast("Áudio não disponível para esta fonte.", "warning", 4000);
+    showToast(
+      "Esta fonte não emite som. O áudio só é capturado se a janela/tela estiver reproduzindo áudio.",
+      "warning",
+      5000,
+    );
   }
 
   stream.getVideoTracks()[0].onended = () => {
@@ -473,11 +450,6 @@ async function handleDeepLinkRoom(roomId) {
 }
 
 btnStart.addEventListener("click", async () => {
-  if (!peerReady || !peer) {
-    await destroyPeer();
-    await ensurePeer();
-  }
-
   const result = await window.viewcord.ensureDiscord();
   if (!result.ok) {
     showToast("Abra o Discord primeiro e tente novamente.", "error");
@@ -485,6 +457,7 @@ btnStart.addEventListener("click", async () => {
   }
 
   try {
+    await ensurePeer();
     showToast("Escolhendo tela...", "info", 2000);
     const roomId = await startShare();
     document.getElementById("room-id").textContent = roomId;
@@ -558,8 +531,3 @@ window.viewcord.onDeepLink((roomId) => {
 window.viewcord.send("renderer-ready");
 
 setStatus("⚪ Ocioso — clique em Compartilhar ou Assistir para conectar");
-
-if (pendingDeepLinkRoom) {
-  handleDeepLinkRoom(pendingDeepLinkRoom);
-  pendingDeepLinkRoom = null;
-}
