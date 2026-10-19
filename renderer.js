@@ -7,6 +7,7 @@ const screens = {
 const statusEl = document.getElementById("status");
 const btnStart = document.getElementById("btn-start");
 const qualitySelect = document.getElementById("quality-select");
+const captureAudioCheckbox = document.getElementById("capture-audio");
 
 let peer = null;
 let currentCall = null;
@@ -265,18 +266,53 @@ function getVideoConstraints(sourceId) {
 }
 
 async function startShare() {
+  if (!peerReady || !peer.id) {
+    throw new Error("P2P ainda não conectou. Aguarde...");
+  }
+
   const source = await showSourcePicker();
   if (!source) throw new Error("Compartilhamento cancelado");
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: {
-      mandatory: getVideoConstraints(source.id),
-    },
-  });
+  const captureAudio = captureAudioCheckbox.checked;
+
+  const videoConstraints = getVideoConstraints(source.id);
+  const audioConstraints = captureAudio
+    ? {
+        mandatory: {
+          chromeMediaSource: "desktop",
+          chromeMediaSourceId: source.id,
+        },
+      }
+    : false;
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: audioConstraints,
+      video: { mandatory: videoConstraints },
+    });
+  } catch (err) {
+    if (captureAudio) {
+      showToast(
+        "Não foi possível capturar o áudio. Tentando sem áudio...",
+        "warning",
+      );
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { mandatory: videoConstraints },
+      });
+    } else {
+      throw err;
+    }
+  }
 
   currentStream = stream;
   const roomId = peer.id;
+
+  const audioTrack = stream.getAudioTracks()[0];
+  if (audioTrack) {
+    showToast(`Áudio: ${audioTrack.label || "ativo"}`, "success", 2000);
+  }
 
   stream.getVideoTracks()[0].onended = () => {
     stopShare();

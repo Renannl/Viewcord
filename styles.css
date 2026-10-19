@@ -496,6 +496,32 @@ h2 {
   box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2);
 }
 
+.audio-toggle-wrapper {
+  margin-top: 8px;
+}
+
+.audio-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #dbdee1;
+  cursor: pointer;
+}
+
+.audio-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #5865f2;
+}
+
+.audio-hint {
+  font-size: 11px;
+  color: #949ba4;
+  margin-top: 4px;
+  margin-left: 24px;
+}
+
 .toast-container {
   position: fixed;
   top: 52px;
