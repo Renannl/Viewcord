@@ -3,17 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Viewcord</title>
+    <title>ViewCord</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div class="toast-container" id="toast-container"></div>
     <div class="window">
       <header class="titlebar">
-        <span class="title">Viewcord</span>
-        <div class="controls">
-          <button class="btn-min" onclick="viewcord.minimize()">−</button>
-          <button class="btn-close" onclick="viewcord.close()">×</button>
+        <span class="title">ViewCord</span>
+        <div class="controls" data-tauri-drag-region>
+          <button id="btn-min" class="btn-min">–</button>
+          <button id="btn-close" class="btn-close">✕</button>
         </div>
       </header>
 
@@ -31,7 +31,7 @@
               <option value="fhd">Full HD (1920x1080, 60fps)</option>
             </select>
           </div>
-          
+
           <div class="audio-toggle-wrapper">
             <label class="audio-toggle">
               <input type="checkbox" id="capture-audio" checked />
@@ -97,7 +97,7 @@
       </footer>
     </div>
 
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script src="renderer.js"></script>
   </body>
 </html>

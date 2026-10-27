@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Viewcord",
+  "version": "1.0.0",
+  "identifier": "com.viewcord.app",
+  "build": {
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Viewcord",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "minWidth": 640,
+        "minHeight": 480,
+        "fullscreen": false,
+        "decorations": false,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "windows": {
+      "wix": null,
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["viewcord"]
+      }
+    }
+  }
+}

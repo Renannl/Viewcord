@@ -1,74 +1,14 @@
 {
   "name": "viewcord",
-  "version": "0.1.2",
-  "description": "Viewcord",
-  "main": "main.js",
-  "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev",
-    "pack": "electron-builder --win nsis"
-  },
-  "dependencies": {
-    "discord-rpc": "^4.0.1"
-  },
+  "version": "1.0.0",
+  "description": "Compartilhamento de tela via Discord",
+"scripts": {
+  "tauri": "tauri",
+  "dev": "npx serve src -p 1420",
+  "build": "tauri build"
+},
   "devDependencies": {
-    "electron": "^32.0.0",
-    "electron-builder": "^25.1.8"
-  },
-  "build": {
-    "appId": "com.viewcord.app",
-    "productName": "Viewcord",
-    "copyright": "Copyright © 2026 Viewcord",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "discord.js",
-      "preload.js",
-      "index.html",
-      "renderer.js",
-      "styles.css",
-      "assets/**/*",
-      "node_modules/discord-rpc/**/*",
-      "!node_modules/**/*/{CHANGELOG,CHANGES,HISTORY,README,readme,*.md,*.map,*.ts,*.tsx,*.flow}",
-      "!**/{test,tests,__tests__,docs,doc,examples,example,samples}/**"
-    ],
-    "asar": true,
-    "npmRebuild": true,
-    "buildDependenciesFromSource": true,
-    "protocols": [
-      {
-        "name": "Viewcord",
-        "schemes": [
-          "viewcord"
-        ]
-      }
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "assets/icon.ico"
-    },
-    "nsis": {
-      "oneClick": true,
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico",
-      "runAfterFinish": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": false,
-      "deleteAppDataOnUninstall": false,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Viewcord",
-      "artifactName": "ViewCord-Setup-${version}.exe"
-    }
+    "@tauri-apps/cli": "^2.0.0",
+    "serve": "^14.2.6"
   }
 }

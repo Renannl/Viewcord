@@ -17,6 +17,9 @@ let pendingDeepLinkRoom = null;
 let peerConnecting = false;
 let globalCallListenerSet = false;
 
+const tauri = window.__TAURI__?.core;
+const tauriEvent = window.__TAURI__?.event;
+
 function showScreen(name) {
   Object.values(screens).forEach((s) => s.classList.add("hidden"));
   screens[name].classList.remove("hidden");
@@ -107,7 +110,6 @@ function initPeer() {
       },
     });
 
-    // ------------- HOST: recebe conexão de dados e inicia a call -------------
     peer.on("connection", (conn) => {
       conn.on("open", () => {
         console.log("Conexão de dados aberta com:", conn.peer);
@@ -182,73 +184,21 @@ async function ensurePeer() {
   return initPeer();
 }
 
-async function showSourcePicker() {
-  const sources = await window.viewcord.getSources();
-
-  const modal = document.createElement("div");
-  modal.className = "source-picker-modal";
-  modal.innerHTML = `
-    <div class="source-picker">
-      <h3>Escolha o que compartilhar</h3>
-      <div class="sources-grid">
-        ${sources
-          .map(
-            (source, idx) => `
-          <div class="source-item" data-idx="${idx}">
-            <img src="${source.thumbnail}" alt="${source.name}">
-            <span>${source.name}</span>
-          </div>
-        `,
-          )
-          .join("")}
-      </div>
-      <button class="btn-cancel">Cancelar</button>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-
-  return new Promise((resolve) => {
-    modal.querySelectorAll(".source-item").forEach((item) => {
-      item.addEventListener("click", () => {
-        const idx = parseInt(item.dataset.idx);
-        document.body.removeChild(modal);
-        resolve(sources[idx]);
-      });
-    });
-
-    modal.querySelector(".btn-cancel").addEventListener("click", () => {
-      document.body.removeChild(modal);
-      resolve(null);
-    });
-  });
-}
-
-function getVideoConstraints(sourceId) {
+function getVideoConstraints() {
   const quality = qualitySelect.value;
-  const base = {
-    chromeMediaSource: "desktop",
-    chromeMediaSourceId: sourceId,
-  };
 
   if (quality === "fhd") {
     return {
-      ...base,
-      minWidth: 1920,
-      maxWidth: 1920,
-      minHeight: 1080,
-      maxHeight: 1080,
-      maxFrameRate: 60,
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      frameRate: { ideal: 60 },
     };
   }
 
   return {
-    ...base,
-    minWidth: 1280,
-    maxWidth: 1280,
-    minHeight: 720,
-    maxHeight: 720,
-    maxFrameRate: 30,
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    frameRate: { ideal: 30 },
   };
 }
 
@@ -257,36 +207,24 @@ async function startShare() {
     throw new Error("P2P ainda não conectou. Aguarde...");
   }
 
-  const source = await showSourcePicker();
-  if (!source) throw new Error("Compartilhamento cancelado");
-
   const captureAudio = captureAudioCheckbox.checked;
-
-  const videoConstraints = getVideoConstraints(source.id);
-  const audioConstraints = captureAudio
-    ? {
-        mandatory: {
-          chromeMediaSource: "desktop",
-          chromeMediaSourceId: source.id,
-        },
-      }
-    : false;
+  const videoConstraints = getVideoConstraints();
 
   let stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: audioConstraints,
-      video: { mandatory: videoConstraints },
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: videoConstraints,
+      audio: captureAudio,
     });
   } catch (err) {
     if (captureAudio) {
       showToast(
-        "Não foi possível capturar o áudio da janela. Tentando sem áudio...",
+        "Não foi possível capturar áudio. Tentando sem áudio...",
         "warning",
       );
-      stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: videoConstraints,
         audio: false,
-        video: { mandatory: videoConstraints },
       });
     } else {
       throw err;
@@ -296,20 +234,7 @@ async function startShare() {
   currentStream = stream;
   const roomId = peer.id;
 
-  const audioTrack = stream.getAudioTracks()[0];
-  if (audioTrack) {
-    showToast(`Áudio: ${audioTrack.label || "ativo"}`, "success", 2000);
-  } else if (captureAudio) {
-    showToast(
-      "Esta fonte não emite som. O áudio só é capturado se a janela/tela estiver reproduzindo áudio.",
-      "warning",
-      5000,
-    );
-  }
-
-  stream.getVideoTracks()[0].onended = () => {
-    stopShare();
-  };
+  stream.getVideoTracks()[0].onended = () => stopShare();
 
   return roomId;
 }
@@ -345,7 +270,11 @@ async function stopShare() {
     currentStream.getTracks().forEach((t) => t.stop());
     currentStream = null;
   }
-  await window.viewcord.clearRoom();
+
+  if (tauri) {
+    await tauri.invoke("clear_room");
+  }
+
   showScreen("idle");
   destroyPeer();
 }
@@ -361,7 +290,6 @@ async function joinRoom(roomId) {
     conn.on("open", () => {
       clearTimeout(timeout);
       console.log("✅ Conectado na sala:", roomId);
-      // Avisa o host que o viewer está pronto para receber a call
       conn.send("viewer-ready");
       resolve();
     });
@@ -395,7 +323,6 @@ function answerCall(call) {
         })
         .catch((err) => {
           console.error("Erro ao dar play:", err);
-          // Se o navegador bloquear áudio, tenta mudo e oferece botão para ativar
           video.muted = true;
           video.play().then(() => {
             console.log("Vídeo tocando mudo — aguardando interação");
@@ -449,23 +376,24 @@ async function handleDeepLinkRoom(roomId) {
   }
 }
 
+// Event listeners
 btnStart.addEventListener("click", async () => {
-  const result = await window.viewcord.ensureDiscord();
-  if (!result.ok) {
-    showToast("Abra o Discord primeiro e tente novamente.", "error");
-    return;
-  }
-
   try {
+    if (tauri) {
+      const result = await tauri.invoke("ensure_discord_rpc");
+      if (!result) {
+        showToast("Abra o Discord primeiro e tente novamente.", "error");
+        return;
+      }
+    }
+
     await ensurePeer();
     showToast("Escolhendo tela...", "info", 2000);
     const roomId = await startShare();
     document.getElementById("room-id").textContent = roomId;
 
-    const update = await window.viewcord.updateRoom(roomId);
-    if (!update.ok) {
-      showToast(update.message, "error");
-      return;
+    if (tauri) {
+      await tauri.invoke("update_room", { roomId });
     }
 
     showScreen("sharing");
@@ -517,26 +445,41 @@ document.getElementById("btn-copy").addEventListener("click", () => {
   showToast("ID copiado!", "success", 1500);
 });
 
-window.viewcord.onDeepLink((roomId) => {
-  console.log("Deep link recebido no renderer (push):", roomId);
-  handleDeepLinkRoom(roomId);
+// Window controls
+document.getElementById("btn-min").addEventListener("click", () => {
+  if (tauri) {
+    tauri.invoke("minimize_window");
+  }
 });
 
-async function checkPendingDeepLink() {
-  console.log("Verificando deep link pendente...");
-  try {
-    const roomId = await window.viewcord.getPendingDeepLink();
-    console.log("Deep link pendente:", roomId);
-    if (roomId) {
-      handleDeepLinkRoom(roomId);
-    }
-  } catch (err) {
-    console.error("Erro ao verificar deep link pendente:", err);
+document.getElementById("btn-close").addEventListener("click", () => {
+  if (tauri) {
+    tauri.invoke("close_window");
   }
+});
+
+// Deep link handling
+if (tauri) {
+  tauriEvent.listen("deep-link", (event) => {
+    console.log("Deep link recebido (push):", event.payload);
+    handleDeepLinkRoom(event.payload);
+  });
+
+  async function checkPendingDeepLink() {
+    console.log("Verificando deep link pendente...");
+    try {
+      const roomId = await tauri.invoke("get_pending_deep_link");
+      console.log("Deep link pendente:", roomId);
+      if (roomId) {
+        handleDeepLinkRoom(roomId);
+      }
+    } catch (err) {
+      console.error("Erro ao verificar deep link pendente:", err);
+    }
+  }
+
+  tauri.invoke("renderer_ready");
+  checkPendingDeepLink();
 }
-
-window.viewcord.send("renderer-ready");
-
-checkPendingDeepLink();
 
 setStatus("⚪ Ocioso — clique em Compartilhar ou Assistir para conectar");

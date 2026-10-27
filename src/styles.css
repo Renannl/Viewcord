@@ -538,6 +538,69 @@ h2 {
 
 .toast-container {
   position: fixed;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+
+.toast {
+  background: #2b2d31;
+  border: 1px solid #3f4147;
+  border-left: 4px solid #5865f2;
+  color: #dbdee1;
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: fadeInUp 0.3s ease;
+}
+
+.toast.error { border-left-color: #da373c; }
+.toast.success { border-left-color: #57e39b; }
+.toast.warning { border-left-color: #f0b232; }
+
+.toast-out {
+  animation: fadeOut 0.3s ease forwards;
+}
+
+@keyframes fadeOut {
+  to { opacity: 0; transform: translateX(20px); }
+}
+
+.audio-toggle-wrapper {
+  margin-top: 8px;
+}
+
+.audio-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #dbdee1;
+  cursor: pointer;
+}
+
+.audio-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #5865f2;
+}
+
+.audio-hint {
+  font-size: 11px;
+  color: #949ba4;
+  margin-top: 4px;
+  margin-left: 24px;
+}
+
+.toast-container {
+  position: fixed;
   top: 52px;
   right: 20px;
   z-index: 9999;
