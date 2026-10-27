@@ -34,7 +34,8 @@
       "wix": null,
       "nsis": {
         "installMode": "currentUser",
-        "displayLanguageSelector": false
+        "displayLanguageSelector": false,
+        "installerHooks": null
       }
     }
   },

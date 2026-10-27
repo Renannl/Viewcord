@@ -32,7 +32,7 @@ if (Test-Path -LiteralPath $installerPath) {
     Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
 }
 
-$appPath = "$env:LOCALAPPDATA\Programs\ViewCord\ViewCord.exe"
+$appPath = "$env:LOCALAPPDATA\Programs\Viewcord\Viewcord.exe"
 if (Test-Path -LiteralPath $appPath) {
     Write-Host "Abrindo Viewcord na bandeja..."
     Start-Process `
@@ -42,9 +42,9 @@ if (Test-Path -LiteralPath $appPath) {
         -RedirectStandardOutput "$env:TEMP\viewcord_stdout.log" `
         -RedirectStandardError "$env:TEMP\viewcord_stderr.log"
 } else {
-    Write-Host "ViewCord.exe nao encontrado em $appPath"
+    Write-Host "Viewcord.exe nao encontrado em $appPath"
     Write-Host "Listando conteudo da pasta de instalacao..."
-    Get-ChildItem -Path "$env:LOCALAPPDATA\Programs\ViewCord" -ErrorAction SilentlyContinue
+    Get-ChildItem -Path "$env:LOCALAPPDATA\Programs\Viewcord" -ErrorAction SilentlyContinue
 }
 
 Write-Host "Viewcord instalado com sucesso!"
