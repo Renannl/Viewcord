@@ -1,3 +1,4 @@
+// ===== Referências DOM =====
 const screens = {
   idle: document.getElementById("screen-idle"),
   sharing: document.getElementById("screen-sharing"),
@@ -7,7 +8,8 @@ const screens = {
 const statusEl = document.getElementById("status");
 const btnStart = document.getElementById("btn-start");
 const qualitySelect = document.getElementById("quality-select");
-const captureAudioCheckbox = document.getElementById("capture-audio");
+const audioProcessSelect = document.getElementById("audio-process-select");
+const btnRefreshProcesses = document.getElementById("btn-refresh-processes");
 
 let peer = null;
 let currentCall = null;
@@ -19,6 +21,9 @@ let globalCallListenerSet = false;
 
 const tauri = window.__TAURI__?.core;
 const tauriEvent = window.__TAURI__?.event;
+
+// ===== Estado da captura nativa de áudio =====
+let nativeAudio = null; // { context, processor, destination, track, pcmBuffer, pcmLength, unlisten }
 
 function showScreen(name) {
   Object.values(screens).forEach((s) => s.classList.add("hidden"));
@@ -202,41 +207,199 @@ function getVideoConstraints() {
   };
 }
 
+// ===== Captura de áudio nativo por processo =====
+
+function toUint8Array(payload) {
+  if (payload instanceof Uint8Array) return payload;
+  if (Array.isArray(payload)) return new Uint8Array(payload);
+  if (payload && typeof payload === "object" && Array.isArray(payload.data)) {
+    return new Uint8Array(payload.data);
+  }
+  return null;
+}
+
+function bytesToFloat32(bytes) {
+  // PCM 16-bit interleaved little-endian (nativo do Windows) -> Float32
+  if (!bytes || bytes.length === 0) return new Float32Array(0);
+  const int16 = new Int16Array(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength / 2,
+  );
+  const out = new Float32Array(int16.length);
+  for (let i = 0; i < int16.length; i++) {
+    out[i] = int16[i] / 32768.0;
+  }
+  return out;
+}
+
+async function startNativeAudio(pid) {
+  if (!tauri || !tauriEvent) {
+    throw new Error("Backend Tauri não disponível");
+  }
+  if (nativeAudio) {
+    console.warn("Captura nativa de áudio já está ativa");
+    return;
+  }
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const context = new AudioCtx({ sampleRate: 48000 });
+
+  const destination = context.createMediaStreamDestination();
+  // 4096 amostras por canal (~85ms) — buffer folgado contra underrun
+  const processor = context.createScriptProcessor(4096, 2, 2);
+
+  const state = {
+    context,
+    destination,
+    processor,
+    track: destination.stream.getAudioTracks()[0],
+    pcmBuffer: new Float32Array(48000 * 2 * 2), // ~2s de PCM interleaved
+    pcmLength: 0,
+    unlisten: null,
+  };
+
+  processor.onaudioprocess = (e) => {
+    const outL = e.outputBuffer.getChannelData(0);
+    const outR = e.outputBuffer.getChannelData(1);
+    const frames = outL.length;
+    const samplesNeeded = frames * 2;
+
+    if (state.pcmLength >= samplesNeeded) {
+      for (let i = 0; i < frames; i++) {
+        outL[i] = state.pcmBuffer[i * 2];
+        outR[i] = state.pcmBuffer[i * 2 + 1];
+      }
+      state.pcmBuffer.copyWithin(0, samplesNeeded, state.pcmLength);
+      state.pcmLength -= samplesNeeded;
+    } else {
+      outL.fill(0);
+      outR.fill(0);
+    }
+  };
+
+  processor.connect(destination);
+
+  const unlisten = await tauriEvent.listen("audio-chunk", (event) => {
+    const bytes = toUint8Array(event.payload);
+    if (!bytes || bytes.length === 0) return;
+
+    const float32 = bytesToFloat32(bytes);
+
+    if (state.pcmLength + float32.length > state.pcmBuffer.length) {
+      const newBuf = new Float32Array(
+        Math.max(state.pcmBuffer.length * 2, state.pcmLength + float32.length),
+      );
+      newBuf.set(state.pcmBuffer.subarray(0, state.pcmLength));
+      state.pcmBuffer = newBuf;
+    }
+
+    state.pcmBuffer.set(float32, state.pcmLength);
+    state.pcmLength += float32.length;
+  });
+
+  state.unlisten = unlisten;
+  nativeAudio = state;
+
+  await context.resume().catch(() => {});
+  await tauri.invoke("start_audio_capture", { pid });
+
+  console.log(`Captura de áudio nativo iniciada para PID ${pid}`);
+}
+
+async function stopNativeAudio() {
+  if (!nativeAudio) return;
+  const state = nativeAudio;
+  nativeAudio = null;
+
+  try {
+    await tauri.invoke("stop_audio_capture");
+  } catch (err) {
+    console.error("Erro ao parar captura nativa:", err);
+  }
+
+  if (state.unlisten) {
+    state.unlisten();
+    state.unlisten = null;
+  }
+
+  if (state.track) {
+    state.track.stop();
+  }
+
+  try {
+    state.processor.disconnect();
+  } catch (_) {}
+
+  try {
+    state.context.close();
+  } catch (_) {}
+}
+
+async function loadAudioProcesses() {
+  if (!tauri) return;
+  try {
+    const processes = await tauri.invoke("list_audio_processes");
+    const currentValue = audioProcessSelect.value;
+
+    audioProcessSelect.innerHTML = '<option value="">Sem áudio</option>';
+
+    processes.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = String(p.pid);
+      opt.textContent = p.name;
+      audioProcessSelect.appendChild(opt);
+    });
+
+    const hasCurrent = [...audioProcessSelect.options].some(
+      (o) => o.value === currentValue,
+    );
+    if (hasCurrent) {
+      audioProcessSelect.value = currentValue;
+    }
+
+    console.log(`Processos de áudio carregados: ${processes.length}`);
+  } catch (err) {
+    showToast(`Erro ao listar processos: ${err}`, "error", 5000);
+  } finally {
+    btnRefreshProcesses.disabled = false;
+    btnRefreshProcesses.textContent = "↻ Atualizar";
+  }
+}
+
 async function startShare() {
   if (!peerReady || !peer.id) {
     throw new Error("P2P ainda não conectou. Aguarde...");
   }
 
-  const captureAudio = captureAudioCheckbox.checked;
   const videoConstraints = getVideoConstraints();
+  const selectedPid = parseInt(audioProcessSelect.value, 10);
+  const captureAudio = !isNaN(selectedPid) && selectedPid > 0;
 
-  let stream;
-  try {
-    stream = await navigator.mediaDevices.getDisplayMedia({
-      video: videoConstraints,
-      audio: captureAudio,
-    });
-  } catch (err) {
-    if (captureAudio) {
+  // Vídeo sempre; o áudio (se solicitado) vem da captura nativa por processo
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    video: videoConstraints,
+    audio: false,
+  });
+
+  currentStream = stream;
+
+  if (captureAudio) {
+    try {
+      await startNativeAudio(selectedPid);
+      stream.addTrack(nativeAudio.track);
+    } catch (err) {
+      console.error("Erro ao capturar áudio nativo:", err);
       showToast(
-        "Não foi possível capturar áudio. Tentando sem áudio...",
+        "Não foi possível capturar o áudio do processo. Seguindo sem áudio...",
         "warning",
       );
-      stream = await navigator.mediaDevices.getDisplayMedia({
-        video: videoConstraints,
-        audio: false,
-      });
-    } else {
-      throw err;
     }
   }
 
-  currentStream = stream;
-  const roomId = peer.id;
-
   stream.getVideoTracks()[0].onended = () => stopShare();
 
-  return roomId;
+  return peer.id;
 }
 
 function showUnmuteOverlay() {
@@ -266,6 +429,9 @@ async function stopShare() {
     currentCall.close();
     currentCall = null;
   }
+
+  await stopNativeAudio();
+
   if (currentStream) {
     currentStream.getTracks().forEach((t) => t.stop());
     currentStream = null;
@@ -376,7 +542,7 @@ async function handleDeepLinkRoom(roomId) {
   }
 }
 
-// Event listeners
+// ===== Event listeners =====
 btnStart.addEventListener("click", async () => {
   try {
     if (tauri) {
@@ -445,6 +611,8 @@ document.getElementById("btn-copy").addEventListener("click", () => {
   showToast("ID copiado!", "success", 1500);
 });
 
+btnRefreshProcesses.addEventListener("click", loadAudioProcesses);
+
 // Window controls
 document.getElementById("btn-min").addEventListener("click", () => {
   if (tauri) {
@@ -480,6 +648,9 @@ if (tauri) {
 
   tauri.invoke("renderer_ready");
   checkPendingDeepLink();
+
+  // Carrega a lista de processos para captura de áudio
+  loadAudioProcesses();
 }
 
 setStatus("⚪ Ocioso — clique em Compartilhar ou Assistir para conectar");
