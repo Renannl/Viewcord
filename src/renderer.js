@@ -17,6 +17,7 @@ let peerReady = false;
 let pendingDeepLinkRoom = null;
 let peerConnecting = false;
 let globalCallListenerSet = false;
+let deepLinkProcessed = false;
 
 const tauri = window.__TAURI__?.core;
 const tauriEvent = window.__TAURI__?.event;
@@ -348,8 +349,7 @@ async function loadAudioProcesses() {
 }
 
 async function ensureLoopbackSupport() {
-  // const supported = await window.__TAURI__.core.invoke("check_process_loopback_support");
-  const supported = false;
+  const supported = await tauri.invoke("check_process_loopback_support");
 
   const warning = document.getElementById("audio-fallback-warning");
   if (!supported && warning) {
@@ -503,6 +503,12 @@ function answerCall(call) {
 }
 
 async function handleDeepLinkRoom(roomId) {
+  if (!roomId) return;
+
+  if (deepLinkProcessed && roomId === lastProcessedRoom) return;
+  deepLinkProcessed = true;
+  lastProcessedRoom = roomId;
+
   if (currentStream) {
     showToast("Você já está compartilhando. Pare primeiro.", "warning");
     return;
@@ -520,9 +526,12 @@ async function handleDeepLinkRoom(roomId) {
     await joinRoom(roomId);
     showToast("Assistindo", "success");
   } catch (err) {
+    console.error("Erro ao entrar pela sala:", err);
     showToast(err.message || "Erro ao conectar. Tente novamente.", "error");
+    deepLinkProcessed = false;
   }
 }
+let lastProcessedRoom = null;
 
 btnStart.addEventListener("click", async () => {
   try {
@@ -546,7 +555,7 @@ btnStart.addEventListener("click", async () => {
     showScreen("sharing");
     showToast("Ao vivo!", "success");
   } catch (err) {
-    showToast(err.message || "Erro ao iniciar compartilhamento.", "error");
+    showToast(err.message || "Abra seu discord primeiro.", "error");
   }
 });
 
@@ -608,6 +617,7 @@ document.getElementById("btn-close").addEventListener("click", () => {
 
 if (tauri) {
   tauriEvent.listen("deep-link", (event) => {
+    console.log("deep-link recebido no renderer:", event.payload);
     handleDeepLinkRoom(event.payload);
   });
 

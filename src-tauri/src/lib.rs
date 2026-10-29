@@ -16,19 +16,14 @@ static RENDERER_READY: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
 
 #[tauri::command]
 fn get_pending_deep_link() -> Option<String> {
-    let mut pending = PENDING_DEEP_LINK.lock().unwrap();
-    pending.take()
+    PENDING_DEEP_LINK.lock().unwrap().take()
 }
 
 #[tauri::command]
 fn renderer_ready(app: AppHandle) {
-    {
-        let mut ready = RENDERER_READY.lock().unwrap();
-        *ready = true;
-    }
+    *RENDERER_READY.lock().unwrap() = true;
 
-    let mut pending = PENDING_DEEP_LINK.lock().unwrap();
-    if let Some(room_id) = pending.take() {
+    if let Some(room_id) = PENDING_DEEP_LINK.lock().unwrap().take() {
         let _ = app.emit("deep-link", room_id);
     }
 }
@@ -60,8 +55,28 @@ async fn clear_room() -> Result<(), String> {
     discord_rpc::update_presence(None).await.map_err(|e| e.to_string())
 }
 
+fn emit_deep_link(app: &AppHandle, room_id: String) {
+    *PENDING_DEEP_LINK.lock().unwrap() = Some(room_id.clone());
+
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+
+    if *RENDERER_READY.lock().unwrap() {
+        let _ = app.emit("deep-link", room_id);
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(url) = argv.get(1) {
+                if let Some(room_id) = extract_room_id(url) {
+                    emit_deep_link(app, room_id);
+                }
+            }
+        }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
@@ -78,29 +93,27 @@ pub fn run() {
             audio_capture::check_process_loopback_support,
         ])
         .setup(|app| {
-            let handle = app.handle().clone();
+            let handle_deeplink = app.handle().clone();
+            let handle_startup = app.handle().clone();
 
             app.deep_link().on_open_url(move |event| {
-                let urls = event.urls();
-                if let Some(url) = urls.first() {
-                    let url_str = url.to_string();
-
-                    if let Some(room_id) = extract_room_id(&url_str) {
-                        {
-                            let mut pending = PENDING_DEEP_LINK.lock().unwrap();
-                            *pending = Some(room_id.clone());
-                        }
-
-                        let ready = RENDERER_READY.lock().unwrap();
-                        if *ready {
-                            let _ = handle.emit("deep-link", room_id);
-                        }
+                if let Some(url) = event.urls().first() {
+                    if let Some(room_id) = extract_room_id(&url.to_string()) {
+                        emit_deep_link(&handle_deeplink, room_id);
                     }
                 }
             });
 
-            let show_item = MenuItem::with_id(app, "show", "Abrir ViewCord", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
+            if let Some(url) = std::env::args().nth(1) {
+                if let Some(room_id) = extract_room_id(&url) {
+                    emit_deep_link(&handle_startup, room_id);
+                }
+            }
+
+            let show_item =
+                MenuItem::with_id(app, "show", "Abrir ViewCord", true, None::<&str>)?;
+            let quit_item =
+                MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
             let icon = app
@@ -112,7 +125,7 @@ pub fn run() {
                 .icon(icon)
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .on_menu_event(move |app, event| match event.id.as_ref() {
+                .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();
@@ -156,7 +169,9 @@ pub fn run() {
 
 fn extract_room_id(url: &str) -> Option<String> {
     let url = url.trim_start_matches("viewcord://");
-    url.split('&')
+    let url = url.trim_start_matches('?');
+
+    url.split(&['&', '/'][..])
         .find(|param| param.starts_with("room="))
         .map(|param| param.trim_start_matches("room=").to_string())
 }
