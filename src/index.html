@@ -5,66 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ViewCord</title>
     <link rel="stylesheet" href="styles.css" />
-    <style>
-      /* ===== Seletor de áudio por processo (nativo) ===== */
-      .audio-capture-wrapper {
-        margin-top: 12px;
-      }
-      .audio-capture-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-      }
-      .audio-capture-row label {
-        font-size: 13px;
-        color: #dbdee1;
-      }
-      #audio-process-select {
-        width: 100%;
-        margin-top: 6px;
-        padding: 8px 10px;
-        border: 1px solid #3f4147;
-        border-radius: 8px;
-        background: #1e1f22;
-        color: #e4e7f5;
-        font-size: 13px;
-        font-family: inherit;
-        outline: none;
-        transition:
-          border-color 0.2s ease,
-          box-shadow 0.2s ease;
-      }
-      #audio-process-select:focus {
-        border-color: #5865f2;
-        box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2);
-      }
-      .refresh-btn {
-        border: 1px solid #3f4147;
-        border-radius: 8px;
-        background: #1e1f22;
-        color: #aeb8ff;
-        padding: 6px 10px;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        transition:
-          background 0.2s ease,
-          transform 0.1s ease;
-      }
-      .refresh-btn:hover {
-        background: #2b2d31;
-      }
-      .refresh-btn:active {
-        transform: scale(0.96);
-      }
-      .audio-hint {
-        font-size: 11px;
-        color: #949ba4;
-        margin-top: 6px;
-        line-height: 1.45;
-      }
-    </style>
   </head>
   <body>
     <div class="toast-container" id="toast-container"></div>
@@ -82,7 +22,8 @@
         class="audio-fallback-warning"
         style="display: none"
       >
-        Seu Windows não suporta captura de áudio por aplicativo. A transmissão seguirá sem áudio.
+        Seu Windows não suporta captura de áudio por aplicativo. A transmissão
+        seguirá sem áudio.
       </div>
 
       <main class="content">
@@ -101,24 +42,26 @@
           </div>
 
           <div class="audio-capture-wrapper">
-            <div class="audio-capture-row">
+            <div class="audio-capture-label-row">
               <label for="audio-process-select">Áudio do aplicativo</label>
               <button
                 type="button"
                 id="btn-refresh-processes"
                 class="refresh-btn"
                 title="Atualizar lista de processos"
+                aria-label="Atualizar processos"
               >
-                ↻ Atualizar
+                &#x21bb;
               </button>
             </div>
-            <select id="audio-process-select">
-              <option value="">Sem áudio</option>
-            </select>
+            <div class="audio-capture-row">
+              <select id="audio-process-select">
+                <option value="">Sem áudio</option>
+              </select>
+            </div>
             <p class="audio-hint">
-              Escolha o processo (navegador, jogo, app) cujo áudio será
-              transmitido. O Discord fica de fora automaticamente. Deixe o app
-              alvo aberto antes de atualizar.
+              Escolha o processo cujo áudio será transmitido. O Discord fica de
+              fora automaticamente.
             </p>
           </div>
 
@@ -139,14 +82,34 @@
         </div>
 
         <div id="screen-sharing" class="screen hidden">
-          <h2>Ao vivo</h2>
-          <p class="subtitle">Compartilhando sua tela</p>
+          <h3>Compartilhando sua tela...</h3>
+
+          <div class="live-status" id="live-status" style="display: none">
+            <span class="live-dot"></span>
+            <span class="live-label">AO VIVO</span>
+            <span class="live-separator">•</span>
+            <span class="viewers-count" id="viewers-count">0 espectadores</span>
+          </div>
 
           <div class="room-info">
-            <label>ID da sala (compartilhe com amigos):</label>
+            <label>ID da sala — compartilhe com amigos</label>
             <div class="room-id-box">
               <code id="room-id">-</code>
-              <button id="btn-copy" class="btn-icon" title="Copiar">📋</button>
+              <button id="btn-copy" class="btn-icon" title="Copiar">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path
+                    d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                  ></path>
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -164,10 +127,21 @@
               class="btn-video-fs"
               title="Tela cheia"
             >
-              ⛶
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+                ></path>
+              </svg>
             </button>
           </div>
-          <button id="btn-leave">Sair</button>
+          <button id="btn-leave" class="btn-secondary">Sair</button>
         </div>
       </main>
 

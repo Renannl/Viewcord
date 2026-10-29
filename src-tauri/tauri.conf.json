@@ -12,11 +12,11 @@
     "windows": [
       {
         "title": "Viewcord",
-        "width": 1200,
-        "height": 800,
+        "width": 440,
+        "height": 560,
+        "minWidth": 400,
+        "minHeight": 500,
         "resizable": true,
-        "minWidth": 640,
-        "minHeight": 480,
         "fullscreen": false,
         "decorations": false,
         "visible": false
