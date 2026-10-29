@@ -332,20 +332,22 @@ h2 {
   transform: scale(0.92);
 }
 
-/* Vídeo com cantos suaves */
 .video-wrapper {
   position: relative;
   width: 100%;
-  max-width: 960px;
+  max-width: none;        
   border-radius: 10px;
   overflow: hidden;
   background: #000;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  aspect-ratio: 16 / 9;   
+  margin: 0 auto;
 }
 
 #remote-video {
   width: 100%;
-  aspect-ratio: 16/9;
+  height: 100%;      
+  object-fit: contain;     
   display: block;
   background: #000;
   animation: fadeIn 0.4s ease;
