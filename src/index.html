@@ -5,6 +5,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ViewCord</title>
     <link rel="stylesheet" href="styles.css" />
+    <style>
+      /* ===== Seletor de áudio por processo (nativo) ===== */
+      .audio-capture-wrapper {
+        margin-top: 12px;
+      }
+      .audio-capture-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .audio-capture-row label {
+        font-size: 13px;
+        color: #dbdee1;
+      }
+      #audio-process-select {
+        width: 100%;
+        margin-top: 6px;
+        padding: 8px 10px;
+        border: 1px solid #3f4147;
+        border-radius: 8px;
+        background: #1e1f22;
+        color: #e4e7f5;
+        font-size: 13px;
+        font-family: inherit;
+        outline: none;
+        transition:
+          border-color 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+      #audio-process-select:focus {
+        border-color: #5865f2;
+        box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2);
+      }
+      .refresh-btn {
+        border: 1px solid #3f4147;
+        border-radius: 8px;
+        background: #1e1f22;
+        color: #aeb8ff;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          background 0.2s ease,
+          transform 0.1s ease;
+      }
+      .refresh-btn:hover {
+        background: #2b2d31;
+      }
+      .refresh-btn:active {
+        transform: scale(0.96);
+      }
+      .audio-hint {
+        font-size: 11px;
+        color: #949ba4;
+        margin-top: 6px;
+        line-height: 1.45;
+      }
+    </style>
   </head>
   <body>
     <div class="toast-container" id="toast-container"></div>
@@ -32,14 +92,25 @@
             </select>
           </div>
 
-          <div class="audio-toggle-wrapper">
-            <label class="audio-toggle">
-              <input type="checkbox" id="capture-audio" checked />
-              <span>Capturar áudio da janela</span>
-            </label>
+          <div class="audio-capture-wrapper">
+            <div class="audio-capture-row">
+              <label for="audio-process-select">Áudio do aplicativo</label>
+              <button
+                type="button"
+                id="btn-refresh-processes"
+                class="refresh-btn"
+                title="Atualizar lista de processos"
+              >
+                ↻ Atualizar
+              </button>
+            </div>
+            <select id="audio-process-select">
+              <option value="">Sem áudio</option>
+            </select>
             <p class="audio-hint">
-              Recomendado: compartilhe uma janela, não a tela inteira, para não
-              capturar o Discord.
+              Escolha o processo (navegador, jogo, app) cujo áudio será
+              transmitido. O Discord fica de fora automaticamente. Deixe o app
+              alvo aberto antes de atualizar.
             </p>
           </div>
 

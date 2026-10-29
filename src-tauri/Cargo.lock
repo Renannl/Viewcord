@@ -3921,6 +3921,8 @@ dependencies = [
  "tauri-plugin-deep-link",
  "tauri-plugin-shell",
  "tokio",
+ "windows",
+ "windows-core",
 ]
 
 [[package]]

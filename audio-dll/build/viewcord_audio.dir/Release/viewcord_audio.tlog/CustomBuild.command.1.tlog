@@ -1,0 +1,10 @@
+^C:\USERS\RENAN.BONI\DOCUMENTS\WORK\DISC\AUDIO-DLL\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/renan.boni/Documents/work/disc/audio-dll -BC:/Users/renan.boni/Documents/work/disc/audio-dll/build --check-stamp-file C:/Users/renan.boni/Documents/work/disc/audio-dll/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

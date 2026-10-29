@@ -1,0 +1,4 @@
+C:/Users/renan.boni/Documents/work/disc/audio-dll/build/CMakeFiles/minhook.dir
+C:/Users/renan.boni/Documents/work/disc/audio-dll/build/CMakeFiles/viewcord_audio.dir
+C:/Users/renan.boni/Documents/work/disc/audio-dll/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/renan.boni/Documents/work/disc/audio-dll/build/CMakeFiles/ZERO_CHECK.dir

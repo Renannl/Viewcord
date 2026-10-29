@@ -9,6 +9,7 @@ use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
 mod discord_rpc;
+mod audio_capture;
 
 static PENDING_DEEP_LINK: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 static RENDERER_READY: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
@@ -71,6 +72,9 @@ pub fn run() {
             ensure_discord_rpc,
             update_room,
             clear_room,
+            audio_capture::list_audio_processes,
+            audio_capture::start_audio_capture,
+            audio_capture::stop_audio_capture,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -139,6 +143,8 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            audio_capture::setup(app)?;
 
             // Show window on first launch (unless started hidden)
             let window = app.get_webview_window("main").unwrap();
