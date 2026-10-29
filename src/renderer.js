@@ -1,4 +1,3 @@
-// ===== Referências DOM =====
 const screens = {
   idle: document.getElementById("screen-idle"),
   sharing: document.getElementById("screen-sharing"),
@@ -22,8 +21,7 @@ let globalCallListenerSet = false;
 const tauri = window.__TAURI__?.core;
 const tauriEvent = window.__TAURI__?.event;
 
-// ===== Estado da captura nativa de áudio =====
-let nativeAudio = null; // { context, processor, destination, track, pcmBuffer, pcmLength, unlisten }
+let nativeAudio = null;
 
 function showScreen(name) {
   Object.values(screens).forEach((s) => s.classList.add("hidden"));
@@ -61,7 +59,6 @@ function setStatus(text) {
 
 function destroyPeer() {
   if (!peer) return;
-  console.log("Destruindo peer para economizar RAM");
   try {
     peer.destroy();
   } catch (err) {
@@ -79,14 +76,12 @@ function setupGlobalCallListener() {
   globalCallListenerSet = true;
 
   peer.on("call", (call) => {
-    console.log("Call recebida de:", call.peer);
     answerCall(call);
   });
 }
 
 function initPeer() {
   if (peerConnecting) {
-    console.log("Peer já está conectando, aguardando...");
     return new Promise((resolve, reject) => {
       const check = setInterval(() => {
         if (peerReady) {
@@ -116,41 +111,32 @@ function initPeer() {
     });
 
     peer.on("connection", (conn) => {
-      conn.on("open", () => {
-        console.log("Conexão de dados aberta com:", conn.peer);
-      });
+      conn.on("open", () => {});
 
       conn.on("data", (data) => {
         if (data === "viewer-ready" && currentStream) {
-          console.log("Viewer pronto. Iniciando call...");
           const videoTrack = currentStream.getVideoTracks()[0];
           if (!videoTrack || videoTrack.readyState !== "live") {
-            console.warn("Stream não está ativa, não iniciando call");
             return;
           }
 
           currentCall = peer.call(conn.peer, currentStream);
 
           currentCall.on("error", (err) => {
-            console.error("Erro na call (host):", err);
             showToast("Erro na transmissão. Encerrando...", "error");
             stopShare();
           });
 
           currentCall.on("close", () => {
-            console.log("Call fechada (host)");
             currentCall = null;
           });
         }
       });
 
-      conn.on("error", (err) => {
-        console.error("Erro na conexão de dados:", err);
-      });
+      conn.on("error", () => {});
     });
 
     peer.on("open", (id) => {
-      console.log("Meu ID P2P:", id);
       peerReady = true;
       peerConnecting = false;
       btnStart.disabled = false;
@@ -159,7 +145,6 @@ function initPeer() {
       setupGlobalCallListener();
 
       if (pendingDeepLinkRoom) {
-        console.log("Processando deep link pendente:", pendingDeepLinkRoom);
         const roomId = pendingDeepLinkRoom;
         pendingDeepLinkRoom = null;
         handleDeepLinkRoom(roomId);
@@ -169,7 +154,6 @@ function initPeer() {
     });
 
     peer.on("error", (err) => {
-      console.error("❌ Erro P2P:", err);
       peerConnecting = false;
       setStatus("❌ Erro P2P: " + err.message);
 
@@ -207,8 +191,6 @@ function getVideoConstraints() {
   };
 }
 
-// ===== Captura de áudio nativo por processo =====
-
 function toUint8Array(payload) {
   if (payload instanceof Uint8Array) return payload;
   if (Array.isArray(payload)) return new Uint8Array(payload);
@@ -219,7 +201,6 @@ function toUint8Array(payload) {
 }
 
 function bytesToFloat32(bytes) {
-  // PCM 16-bit interleaved little-endian (nativo do Windows) -> Float32
   if (!bytes || bytes.length === 0) return new Float32Array(0);
   const int16 = new Int16Array(
     bytes.buffer,
@@ -238,7 +219,6 @@ async function startNativeAudio(pid) {
     throw new Error("Backend Tauri não disponível");
   }
   if (nativeAudio) {
-    console.warn("Captura nativa de áudio já está ativa");
     return;
   }
 
@@ -246,7 +226,6 @@ async function startNativeAudio(pid) {
   const context = new AudioCtx({ sampleRate: 48000 });
 
   const destination = context.createMediaStreamDestination();
-  // 4096 amostras por canal (~85ms) — buffer folgado contra underrun
   const processor = context.createScriptProcessor(4096, 2, 2);
 
   const state = {
@@ -254,7 +233,7 @@ async function startNativeAudio(pid) {
     destination,
     processor,
     track: destination.stream.getAudioTracks()[0],
-    pcmBuffer: new Float32Array(48000 * 2 * 2), // ~2s de PCM interleaved
+    pcmBuffer: new Float32Array(48000 * 2 * 2),
     pcmLength: 0,
     unlisten: null,
   };
@@ -280,6 +259,11 @@ async function startNativeAudio(pid) {
 
   processor.connect(destination);
 
+  const silence = context.createGain();
+  silence.gain.value = 0;
+  processor.connect(silence);
+  silence.connect(context.destination);
+
   const unlisten = await tauriEvent.listen("audio-chunk", (event) => {
     const bytes = toUint8Array(event.payload);
     if (!bytes || bytes.length === 0) return;
@@ -303,8 +287,6 @@ async function startNativeAudio(pid) {
 
   await context.resume().catch(() => {});
   await tauri.invoke("start_audio_capture", { pid });
-
-  console.log(`Captura de áudio nativo iniciada para PID ${pid}`);
 }
 
 async function stopNativeAudio() {
@@ -357,8 +339,6 @@ async function loadAudioProcesses() {
     if (hasCurrent) {
       audioProcessSelect.value = currentValue;
     }
-
-    console.log(`Processos de áudio carregados: ${processes.length}`);
   } catch (err) {
     showToast(`Erro ao listar processos: ${err}`, "error", 5000);
   } finally {
@@ -367,7 +347,21 @@ async function loadAudioProcesses() {
   }
 }
 
+async function ensureLoopbackSupport() {
+  // const supported = await window.__TAURI__.core.invoke("check_process_loopback_support");
+  const supported = false;
+
+  const warning = document.getElementById("audio-fallback-warning");
+  if (!supported && warning) {
+    warning.style.display = "block";
+  } else if (warning) {
+    warning.style.display = "none";
+  }
+  return supported;
+}
+
 async function startShare() {
+  await ensureLoopbackSupport();
   if (!peerReady || !peer.id) {
     throw new Error("P2P ainda não conectou. Aguarde...");
   }
@@ -376,7 +370,6 @@ async function startShare() {
   const selectedPid = parseInt(audioProcessSelect.value, 10);
   const captureAudio = !isNaN(selectedPid) && selectedPid > 0;
 
-  // Vídeo sempre; o áudio (se solicitado) vem da captura nativa por processo
   const stream = await navigator.mediaDevices.getDisplayMedia({
     video: videoConstraints,
     audio: false,
@@ -455,27 +448,21 @@ async function joinRoom(roomId) {
 
     conn.on("open", () => {
       clearTimeout(timeout);
-      console.log("✅ Conectado na sala:", roomId);
       conn.send("viewer-ready");
       resolve();
     });
 
     conn.on("error", (err) => {
       clearTimeout(timeout);
-      console.error("Erro ao conectar:", err);
       reject(err);
     });
   });
 }
 
 function answerCall(call) {
-  console.log("answerCall iniciado");
   call.answer();
 
   call.on("stream", (remoteStream) => {
-    console.log("Stream remoto recebido:", remoteStream);
-    console.log("Áudio tracks:", remoteStream.getAudioTracks());
-
     const video = document.getElementById("remote-video");
     video.srcObject = remoteStream;
     video.muted = false;
@@ -484,14 +471,11 @@ function answerCall(call) {
       video
         .play()
         .then(() => {
-          console.log("Vídeo tocando com áudio");
           showScreen("watching");
         })
         .catch((err) => {
-          console.error("Erro ao dar play:", err);
           video.muted = true;
           video.play().then(() => {
-            console.log("Vídeo tocando mudo — aguardando interação");
             showUnmuteOverlay();
           });
           showScreen("watching");
@@ -500,7 +484,6 @@ function answerCall(call) {
   });
 
   call.on("error", (err) => {
-    console.error("Erro na call (viewer):", err);
     showToast("Erro na conexão. Voltando ao início...", "error");
     if (currentCall) {
       currentCall.close();
@@ -511,7 +494,6 @@ function answerCall(call) {
   });
 
   call.on("close", () => {
-    console.log("Call fechada (viewer)");
     currentCall = null;
     showScreen("idle");
     destroyPeer();
@@ -542,7 +524,6 @@ async function handleDeepLinkRoom(roomId) {
   }
 }
 
-// ===== Event listeners =====
 btnStart.addEventListener("click", async () => {
   try {
     if (tauri) {
@@ -613,7 +594,6 @@ document.getElementById("btn-copy").addEventListener("click", () => {
 
 btnRefreshProcesses.addEventListener("click", loadAudioProcesses);
 
-// Window controls
 document.getElementById("btn-min").addEventListener("click", () => {
   if (tauri) {
     tauri.invoke("minimize_window");
@@ -626,18 +606,14 @@ document.getElementById("btn-close").addEventListener("click", () => {
   }
 });
 
-// Deep link handling
 if (tauri) {
   tauriEvent.listen("deep-link", (event) => {
-    console.log("Deep link recebido (push):", event.payload);
     handleDeepLinkRoom(event.payload);
   });
 
   async function checkPendingDeepLink() {
-    console.log("Verificando deep link pendente...");
     try {
       const roomId = await tauri.invoke("get_pending_deep_link");
-      console.log("Deep link pendente:", roomId);
       if (roomId) {
         handleDeepLinkRoom(roomId);
       }
@@ -649,7 +625,6 @@ if (tauri) {
   tauri.invoke("renderer_ready");
   checkPendingDeepLink();
 
-  // Carrega a lista de processos para captura de áudio
   loadAudioProcesses();
 }
 

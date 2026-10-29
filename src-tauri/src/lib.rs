@@ -75,16 +75,15 @@ pub fn run() {
             audio_capture::list_audio_processes,
             audio_capture::start_audio_capture,
             audio_capture::stop_audio_capture,
+            audio_capture::check_process_loopback_support,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
 
-            // Deep link handler
             app.deep_link().on_open_url(move |event| {
                 let urls = event.urls();
                 if let Some(url) = urls.first() {
                     let url_str = url.to_string();
-                    println!("Deep link recebido: {}", url_str);
 
                     if let Some(room_id) = extract_room_id(&url_str) {
                         {
@@ -100,12 +99,10 @@ pub fn run() {
                 }
             });
 
-            // Tray icon — ÚNICO, definido aqui (não declarar também no tauri.conf.json)
             let show_item = MenuItem::with_id(app, "show", "Abrir ViewCord", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
-            // Usa o ícone padrão do app (icons/icon.png do bundle.icon) — evita ícone vazio
             let icon = app
                 .default_window_icon()
                 .cloned()
@@ -146,7 +143,6 @@ pub fn run() {
 
             audio_capture::setup(app)?;
 
-            // Show window on first launch (unless started hidden)
             let window = app.get_webview_window("main").unwrap();
             if !std::env::args().any(|arg| arg == "--hidden") {
                 let _ = window.show();

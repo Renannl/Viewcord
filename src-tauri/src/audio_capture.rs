@@ -8,6 +8,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use windows::Win32::Foundation::{
     CloseHandle, E_UNEXPECTED, HANDLE, S_FALSE, WAIT_OBJECT_0, HWND, LPARAM,
 };
+use windows::Win32::System::SystemInformation::OSVERSIONINFOW;
 use windows::Win32::Media::Audio::{
     ActivateAudioInterfaceAsync, IActivateAudioInterfaceAsyncOperation,
     IActivateAudioInterfaceCompletionHandler,
@@ -17,15 +18,15 @@ use windows::Win32::Media::Audio::{
     AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS, AUDCLNT_BUFFERFLAGS_SILENT,
     AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
     PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE, VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK,
+    AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM, WAVEFORMATEX, WAVE_FORMAT_PCM,
 };
 use windows::Win32::System::Com::{
-    CoInitializeEx, CoTaskMemFree, CoUninitialize, COINIT_APARTMENTTHREADED,
+    CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED,
 };
 use windows::Win32::System::Com::StructuredStorage::PROPVARIANT;
 use windows::Win32::System::Variant::VT_BLOB;
 use windows::Win32::System::Threading::{
-    CreateEventW, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, SetEvent,
-    WaitForSingleObject,
+    SetEvent, WaitForSingleObject, CreateEventW,
 };
 use windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
@@ -35,6 +36,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible, WNDENUMPROC,
 };
 use windows_core::{implement, IUnknown, Interface};
+
+#[link(name = "ntdll")]
+extern "system" {
+    fn RtlGetVersion(lp_version_information: *mut OSVERSIONINFOW) -> i32;
+}
 
 #[derive(Clone, serde::Serialize)]
 pub struct AudioProcessInfo {
@@ -75,7 +81,6 @@ unsafe extern "system" fn enum_windows_callback(
     let visible = IsWindowVisible(hwnd).as_bool();
 
     if visible && len > 0 && pid > 0 {
-        println!("[DEBUG CALLBACK] HWND={:?} PID={pid} visible={visible} titulo='{title}'", hwnd.0);
         let out = &mut *(lparam.0 as *mut Vec<(u32, String)>);
         out.push((pid, title));
     }
@@ -153,11 +158,15 @@ pub fn list_audio_processes(_state: State<AudioCaptureState>) -> Result<Vec<Audi
 }
 
 #[tauri::command]
+pub fn check_process_loopback_support() -> bool {
+    supports_process_loopback()
+}
+
+#[tauri::command]
 pub fn start_audio_capture(
     app: AppHandle,
     state: State<AudioCaptureState>,
     pid: u32,
-    _quality: String,
 ) -> Result<String, String> {
     stop_audio_capture(state.clone())?;
 
@@ -230,6 +239,26 @@ impl IActivateAudioInterfaceCompletionHandler_Impl for ActivateCompletionHandler
     }
 }
 
+fn supports_process_loopback() -> bool {
+    unsafe {
+        let mut version_info = OSVERSIONINFOW {
+            dwOSVersionInfoSize: std::mem::size_of::<OSVERSIONINFOW>() as u32,
+            ..std::mem::zeroed()
+        };
+
+        // RtlGetVersion retorna 0 em caso de sucesso (NTSTATUS STATUS_SUCCESS)
+        if RtlGetVersion(&mut version_info) != 0 {
+            return false;
+        }
+
+        let major = version_info.dwMajorVersion;
+        let build = version_info.dwBuildNumber;
+
+        // Windows 10 versão 2004 (build 19041) em diante — inclui Windows 11
+        major > 10 || (major == 10 && build >= 19041)
+    }
+}
+
 fn capture_process_audio(
     app: AppHandle,
     pid: u32,
@@ -278,6 +307,9 @@ fn capture_process_audio(
         )
         .map_err(|e| format!("ActivateAudioInterfaceAsync falhou: {e}"))?;
 
+        // O COM não deve tentar liberar o blob que está na stack
+        std::mem::forget(activation_params);
+
         if WaitForSingleObject(activate_event, 5000) != WAIT_OBJECT_0 {
             let _ = CloseHandle(activate_event);
             return Err("Tempo esgotado ativando áudio do processo".to_string());
@@ -290,24 +322,29 @@ fn capture_process_audio(
             .take()
             .ok_or("Não foi possível obter IAudioClient")?;
 
-        let format = client
-            .GetMixFormat()
-            .map_err(|e| format!("GetMixFormat falhou: {e}"))?;
-        if format.is_null() {
-            return Err("GetMixFormat retornou formato nulo".to_string());
-        }
-        let pwfx = &*format;
+        // Windows 10 às vezes não implementa GetMixFormat no cliente de loopback.
+        // Usa um formato PCM fixo + AUTOCONVERTPCM para a engine converter.
+        let wfx = WAVEFORMATEX {
+            wFormatTag: WAVE_FORMAT_PCM as u16,
+            nChannels: 2,
+            nSamplesPerSec: 48000,
+            nAvgBytesPerSec: 48000 * 2 * 2,
+            nBlockAlign: 4,
+            wBitsPerSample: 16,
+            cbSize: 0,
+        };
 
         client
             .Initialize(
                 AUDCLNT_SHAREMODE_SHARED,
-                AUDCLNT_STREAMFLAGS_LOOPBACK,
+                AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
                 0,
                 0,
-                format,
+                &wfx,
                 None,
             )
             .map_err(|e| format!("IAudioClient::Initialize falhou: {e}"))?;
+
 
         let capture_client: IAudioCaptureClient = client
             .GetService()
@@ -341,13 +378,13 @@ fn capture_process_audio(
                 && flags & (AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) == 0
                 && !data_ptr.is_null()
             {
-                let bytes = frames_available as usize * pwfx.nBlockAlign as usize;
+                let bytes = frames_available as usize * wfx.nBlockAlign as usize;
                 let slice = std::slice::from_raw_parts(data_ptr as *const u8, bytes);
                 let chunk = AudioChunk {
                     data: slice.to_vec(),
-                    sample_rate: pwfx.nSamplesPerSec,
-                    channels: pwfx.nChannels,
-                    bits: pwfx.wBitsPerSample,
+                    sample_rate: wfx.nSamplesPerSec,
+                    channels: wfx.nChannels,
+                    bits: wfx.wBitsPerSample,
                 };
                 let _ = app.emit("audio-chunk", &chunk);
             }
@@ -358,7 +395,6 @@ fn capture_process_audio(
         }
 
         let _ = client.Stop();
-        CoTaskMemFree(Some(format as *const core::ffi::c_void));
         CoUninitialize();
     }
 
