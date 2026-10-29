@@ -502,13 +502,44 @@ async function joinRoom(roomId) {
   });
 }
 
+let spaceBlockerAdded = false;
+
 function answerCall(call) {
   call.answer();
+
+  if (!spaceBlockerAdded) {
+    spaceBlockerAdded = true;
+    document.addEventListener("keydown", (e) => {
+      if (
+        e.code === "Space" &&
+        !screens.watching.classList.contains("hidden")
+      ) {
+        e.preventDefault();
+        const v = document.getElementById("remote-video");
+        if (v && v.paused) v.play().catch(() => {});
+      }
+    });
+  }
 
   call.on("stream", (remoteStream) => {
     const video = document.getElementById("remote-video");
     video.srcObject = remoteStream;
     video.muted = false;
+    video.controls = false;
+    video.controlsList = "noplay noremoteplayback";
+
+    video.addEventListener("pause", () => {
+      if (currentCall) {
+        video.play().catch(() => {});
+      }
+    });
+
+    video.addEventListener("click", (e) => {
+      if (currentCall) {
+        e.preventDefault();
+        if (video.paused) video.play().catch(() => {});
+      }
+    });
 
     video.onloadedmetadata = () => {
       video
