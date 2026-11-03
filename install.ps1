@@ -11,6 +11,7 @@ try {
 $repository = "Renannl/Viewcord"
 $appNamePattern = '(?i)^ViewCord(?:\s|$)'
 
+# Limpa aspas e normaliza o caminho (evita o erro do Join-Path com "C)
 function Get-CleanPathValue {
     param([AllowEmptyString()][string] $Value)
 
@@ -87,7 +88,7 @@ function Invoke-ViewCordUninstaller {
     }
 
     if ([string]::IsNullOrWhiteSpace($command)) {
-        Write-Warning "Sem comando de desinstalacao para $($Entry.DisplayName)."
+        Write-Host "Sem comando de desinstalacao para $($Entry.DisplayName)."
         return
     }
 
@@ -100,12 +101,12 @@ function Invoke-ViewCordUninstaller {
         $filePath = $matches[1].Trim()
         $arguments = $matches[2].Trim()
     } else {
-        Write-Warning "Não consegui interpretar o desinstalador: $command"
+        Write-Host "Nao consegui interpretar o desinstalador: $command"
         return
     }
 
     if (-not (Test-Path -LiteralPath $filePath)) {
-        Write-Warning "Desinstalador não encontrado: $filePath"
+        Write-Host "Desinstalador nao encontrado: $filePath"
         return
     }
 
@@ -129,7 +130,7 @@ function Invoke-ViewCordUninstaller {
             -WindowStyle Hidden `
             -Wait
     } catch {
-        Write-Warning "Falha ao desinstalar $($Entry.DisplayName): $($_.Exception.Message)"
+        Write-Host "Falha ao desinstalar $($Entry.DisplayName): $($_.Exception.Message)"
     }
 }
 
@@ -150,7 +151,7 @@ function Remove-ViewCordInstallFolder {
             Write-Host "Removendo pasta antiga: $fullPath"
             Remove-Item -LiteralPath $fullPath -Recurse -Force
         } catch {
-            Write-Warning "Nao foi possível remover $fullPath. Tente executar como administrador."
+            Write-Host "Nao foi possivel remover $fullPath. Tente executar como administrador."
         }
     }
 }
@@ -197,7 +198,7 @@ function Get-ViewCordExecutableCandidates {
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = [Security.Principal.WindowsPrincipal]::new($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Warning "O PowerShell não esta como administrador. Instalacoes de outros usuarios ou do sistema podem permanecer."
+    Write-Host "O PowerShell nao esta como administrador. Instalacoes de outros usuarios ou do sistema podem permanecer."
 }
 
 Write-Host "Fechando o ViewCord que estiver aberto..."
@@ -250,7 +251,7 @@ $release = Invoke-RestMethod `
     }
 
 if (-not $release.assets) {
-    throw "A release $($release.tag_name) não contem arquivos para baixar."
+    throw "A release $($release.tag_name) nao contem arquivos para baixar."
 }
 
 $setupAssets = @(
@@ -314,7 +315,7 @@ $appPath = Get-ViewCordExecutableCandidates -Entries $newEntries |
     Select-Object -First 1
 
 if (-not $appPath) {
-    throw "A instalacao terminou, mas não encontrei Viewcord.exe. Confira se o instalador concluiu corretamente."
+    throw "A instalacao terminou, mas nao encontrei Viewcord.exe. Confira se o instalador concluiu corretamente."
 }
 
 Write-Host "Abrindo o ViewCord $($release.tag_name) na bandeja..."
