@@ -11,8 +11,22 @@
     <div class="window">
       <header class="titlebar">
         <span class="title">ViewCord</span>
+        <span id="app-version" class="app-version">v0.0.0</span>
         <div class="controls" data-tauri-drag-region>
           <button id="btn-min" class="btn-min">–</button>
+          <button id="btn-max" class="btn-max" title="Maximizar">
+            <svg width="10" height="10" viewBox="0 0 10 10">
+              <rect
+                x="0.5"
+                y="0.5"
+                width="9"
+                height="9"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.4"
+              />
+            </svg>
+          </button>
           <button id="btn-close" class="btn-close">✕</button>
         </div>
       </header>
@@ -119,7 +133,6 @@
         </div>
 
         <div id="screen-watching" class="screen hidden">
-          <h2>Assistindo transmissão</h2>
           <div class="watch-screen">
             <div class="video-wrapper">
               <video id="remote-video" autoplay playsinline></video>
@@ -141,9 +154,9 @@
                   ></path>
                 </svg>
               </button>
+              <button id="btn-leave" class="btn-secondary">Sair</button>
             </div>
           </div>
-          <button id="btn-leave" class="btn-secondary">Sair</button>
         </div>
       </main>
 

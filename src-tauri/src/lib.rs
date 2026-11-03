@@ -20,6 +20,11 @@ fn get_pending_deep_link() -> Option<String> {
 }
 
 #[tauri::command]
+fn get_version(app: tauri::AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+#[tauri::command]
 fn renderer_ready(app: AppHandle) {
     *RENDERER_READY.lock().unwrap() = true;
 
@@ -31,6 +36,17 @@ fn renderer_ready(app: AppHandle) {
 #[tauri::command]
 fn minimize_window(window: Window) {
     let _ = window.minimize();
+}
+
+#[tauri::command]
+fn toggle_maximize(window: Window) -> bool {
+    let maximized = window.is_maximized().unwrap_or(false);
+    if maximized {
+        let _ = window.unmaximize();
+    } else {
+        let _ = window.maximize();
+    }
+    !maximized
 }
 
 #[tauri::command]
@@ -83,6 +99,8 @@ pub fn run() {
             get_pending_deep_link,
             renderer_ready,
             minimize_window,
+            get_version,
+            toggle_maximize,
             close_window,
             ensure_discord_rpc,
             update_room,

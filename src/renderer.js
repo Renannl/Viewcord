@@ -270,7 +270,7 @@ async function startNativeAudio(pid) {
     destination,
     processor,
     track: destination.stream.getAudioTracks()[0],
-    pcmBuffer: new Float32Array(48000 * 2 * 2),
+    pcmBuffer: new Float32Array(48000 * 2 * 0.2),
     pcmLength: 0,
     unlisten: null,
   };
@@ -306,6 +306,13 @@ async function startNativeAudio(pid) {
     if (!bytes || bytes.length === 0) return;
 
     const float32 = bytesToFloat32(bytes);
+
+    const maxBuffer = 48000 * 2 * 0.5;
+    if (state.pcmLength + float32.length > maxBuffer) {
+      const excess = state.pcmLength + float32.length - maxBuffer;
+      state.pcmBuffer.copyWithin(0, excess, state.pcmLength);
+      state.pcmLength -= excess;
+    }
 
     if (state.pcmLength + float32.length > state.pcmBuffer.length) {
       const newBuf = new Float32Array(
@@ -394,6 +401,17 @@ async function ensureLoopbackSupport() {
     warning.style.display = "none";
   }
   return supported;
+}
+
+async function loadAppVersion() {
+  if (!tauri) return;
+  try {
+    const version = await tauri.invoke("get_version");
+    const el = document.getElementById("app-version");
+    if (el) el.textContent = `v${version}`;
+  } catch (err) {
+    console.error("Erro ao buscar versao:", err);
+  }
 }
 
 async function startShare() {
@@ -682,6 +700,12 @@ document.getElementById("btn-min").addEventListener("click", () => {
   }
 });
 
+document.getElementById("btn-max").addEventListener("click", () => {
+  if (tauri) {
+    tauri.invoke("toggle_maximize");
+  }
+});
+
 document.getElementById("btn-close").addEventListener("click", () => {
   if (tauri) {
     tauri.invoke("close_window");
@@ -705,6 +729,7 @@ if (tauri) {
   }
 
   tauri.invoke("renderer_ready");
+  loadAppVersion();
   checkPendingDeepLink();
 
   loadAudioProcesses();
