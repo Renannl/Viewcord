@@ -3,8 +3,51 @@
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch {}
+
 $repository = "Renannl/Viewcord"
 $appNamePattern = '(?i)^ViewCord(?:\s|$)'
+
+function Get-CleanPathValue {
+    param([AllowEmptyString()][string] $Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $null
+    }
+
+    try {
+        $expanded = [Environment]::ExpandEnvironmentVariables($Value.Trim().Trim('"'))
+        return [IO.Path]::GetFullPath($expanded)
+    } catch {
+        return $null
+    }
+}
+
+function Get-ExePathFromValue {
+    param([AllowEmptyString()][string] $Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $null
+    }
+
+    try {
+        $expanded = [Environment]::ExpandEnvironmentVariables($Value.Trim().Trim('"'))
+    } catch {
+        return $null
+    }
+
+    if ($expanded -match '^(.*?\.exe)(?:,\s*\d+)?\s*$') {
+        $exe = $matches[1].Trim()
+        if ($exe -match '[A-Za-z]:\\') {
+            return $exe
+        }
+    }
+
+    return $null
+}
 
 function Get-ViewCordUninstallEntries {
     $registryPaths = @(
@@ -44,7 +87,7 @@ function Invoke-ViewCordUninstaller {
     }
 
     if ([string]::IsNullOrWhiteSpace($command)) {
-        Write-Warning "Sem comando de desinstalação para $($Entry.DisplayName)."
+        Write-Warning "Sem comando de desinstalacao para $($Entry.DisplayName)."
         return
     }
 
@@ -93,14 +136,8 @@ function Invoke-ViewCordUninstaller {
 function Remove-ViewCordInstallFolder {
     param([Parameter(Mandatory = $true)][string] $Path)
 
-    if ([string]::IsNullOrWhiteSpace($Path)) {
-        return
-    }
-
-    try {
-        $expandedPath = [Environment]::ExpandEnvironmentVariables($Path.Trim().Trim('"'))
-        $fullPath = [IO.Path]::GetFullPath($expandedPath)
-    } catch {
+    $fullPath = Get-CleanPathValue -Value $Path
+    if (-not $fullPath) {
         return
     }
 
@@ -113,7 +150,7 @@ function Remove-ViewCordInstallFolder {
             Write-Host "Removendo pasta antiga: $fullPath"
             Remove-Item -LiteralPath $fullPath -Recurse -Force
         } catch {
-            Write-Warning "Não foi possível remover $fullPath. Tente executar como administrador."
+            Write-Warning "Nao foi possível remover $fullPath. Tente executar como administrador."
         }
     }
 }
@@ -124,17 +161,14 @@ function Get-ViewCordExecutableCandidates {
     $candidates = [System.Collections.Generic.List[string]]::new()
 
     foreach ($entry in $Entries) {
-        if ($entry.InstallLocation) {
-            $candidates.Add((Join-Path ([string]$entry.InstallLocation) "Viewcord.exe"))
+        $installLocation = Get-CleanPathValue -Value ([string]$entry.InstallLocation)
+        if ($installLocation) {
+            $candidates.Add((Join-Path $installLocation "Viewcord.exe"))
         }
 
-        if ($entry.DisplayIcon) {
-            $iconPath = [string]$entry.DisplayIcon
-            if ($iconPath -match '^\s*"([^"]+\.exe)"') {
-                $candidates.Add($matches[1])
-            } elseif ($iconPath -match '^\s*(.+?\.exe)(?:,\d+)?\s*$') {
-                $candidates.Add($matches[1].Trim())
-            }
+        $exeFromIcon = Get-ExePathFromValue -Value ([string]$entry.DisplayIcon)
+        if ($exeFromIcon) {
+            $candidates.Add($exeFromIcon)
         }
     }
 
@@ -163,13 +197,13 @@ function Get-ViewCordExecutableCandidates {
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = [Security.Principal.WindowsPrincipal]::new($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Warning "O PowerShell não está como administrador. Instalações de outros usuários ou do sistema podem permanecer."
+    Write-Warning "O PowerShell não esta como administrador. Instalacoes de outros usuarios ou do sistema podem permanecer."
 }
 
 Write-Host "Fechando o ViewCord que estiver aberto..."
 Stop-ViewCordProcesses
 
-Write-Host "Procurando instalações antigas..."
+Write-Host "Procurando instalacoes antigas..."
 $oldEntries = @(Get-ViewCordUninstallEntries)
 
 foreach ($entry in $oldEntries) {
@@ -207,7 +241,7 @@ $foldersToRemove |
     Select-Object -Unique |
     ForEach-Object { Remove-ViewCordInstallFolder -Path $_ }
 
-Write-Host "Consultando a última release estável no GitHub..."
+Write-Host "Consultando a ultima release estavel no GitHub..."
 $release = Invoke-RestMethod `
     -Uri "https://api.github.com/repos/$repository/releases/latest" `
     -Headers @{
@@ -216,7 +250,7 @@ $release = Invoke-RestMethod `
     }
 
 if (-not $release.assets) {
-    throw "A release $($release.tag_name) não contém arquivos para baixar."
+    throw "A release $($release.tag_name) não contem arquivos para baixar."
 }
 
 $setupAssets = @(
@@ -239,11 +273,11 @@ if ($setupAssets.Count -eq 0) {
 }
 
 if ($setupAssets.Count -eq 0) {
-    throw "Não encontrei um instalador setup/installer .exe na release $($release.tag_name)."
+    throw "Nao encontrei um instalador setup/installer .exe na release $($release.tag_name)."
 }
 
 $asset = $setupAssets | Select-Object -First 1
-Write-Host "Versão selecionada: $($release.tag_name)"
+Write-Host "Versao selecionada: $($release.tag_name)"
 Write-Host "Instalador: $($asset.name)"
 
 $installerPath = Join-Path ([IO.Path]::GetFullPath($env:TEMP)) $asset.name
@@ -263,7 +297,7 @@ try {
         -PassThru
 
     if ($installProcess.ExitCode -ne 0) {
-        throw "O instalador terminou com código $($installProcess.ExitCode)."
+        throw "O instalador terminou com codigo $($installProcess.ExitCode)."
     }
 } finally {
     if (Test-Path -LiteralPath $installerPath) {
@@ -276,10 +310,11 @@ Start-Sleep -Seconds 2
 $newEntries = @(Get-ViewCordUninstallEntries)
 $appPath = Get-ViewCordExecutableCandidates -Entries $newEntries |
     Where-Object { Test-Path -LiteralPath $_ } |
+    Where-Object { [IO.Path]::GetFileName($_) -match '(?i)^Viewcord\.exe$' } |
     Select-Object -First 1
 
 if (-not $appPath) {
-    throw "A instalação terminou, mas não encontrei Viewcord.exe. Confira se o instalador concluiu corretamente."
+    throw "A instalacao terminou, mas não encontrei Viewcord.exe. Confira se o instalador concluiu corretamente."
 }
 
 Write-Host "Abrindo o ViewCord $($release.tag_name) na bandeja..."
