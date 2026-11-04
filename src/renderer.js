@@ -262,79 +262,54 @@ async function startNativeAudio(pid) {
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   const context = new AudioCtx({ sampleRate: 48000 });
 
+  await context.audioWorklet.addModule("./audio-pcm-worklet.js");
+
   const destination = context.createMediaStreamDestination();
-  const processor = context.createScriptProcessor(4096, 2, 2);
 
-  const state = {
-    context,
-    destination,
-    processor,
-    track: destination.stream.getAudioTracks()[0],
-    pcmBuffer: new Float32Array(48000 * 2 * 0.2),
-    pcmLength: 0,
-    unlisten: null,
-  };
+  const worklet = new AudioWorkletNode(context, "pcm-audio-processor", {
+    numberOfInputs: 0,
+    numberOfOutputs: 1,
+    outputChannelCount: [2],
+  });
 
-  processor.onaudioprocess = (e) => {
-    const outL = e.outputBuffer.getChannelData(0);
-    const outR = e.outputBuffer.getChannelData(1);
-    const frames = outL.length;
-    const samplesNeeded = frames * 2;
-
-    if (state.pcmLength >= samplesNeeded) {
-      for (let i = 0; i < frames; i++) {
-        outL[i] = state.pcmBuffer[i * 2];
-        outR[i] = state.pcmBuffer[i * 2 + 1];
-      }
-      state.pcmBuffer.copyWithin(0, samplesNeeded, state.pcmLength);
-      state.pcmLength -= samplesNeeded;
-    } else {
-      outL.fill(0);
-      outR.fill(0);
-    }
-  };
-
-  processor.connect(destination);
+  worklet.connect(destination);
 
   const silence = context.createGain();
   silence.gain.value = 0;
-  processor.connect(silence);
+  worklet.connect(silence);
   silence.connect(context.destination);
 
   const unlisten = await tauriEvent.listen("audio-chunk", (event) => {
     const bytes = toUint8Array(event.payload);
-    if (!bytes || bytes.length === 0) return;
+    if (!bytes || bytes.length < 2) return;
 
-    const float32 = bytesToFloat32(bytes);
+    const samples = bytesToFloat32(bytes);
+    if (samples.length === 0) return;
 
-    const maxBuffer = 48000 * 2 * 0.5;
-    if (state.pcmLength + float32.length > maxBuffer) {
-      const excess = state.pcmLength + float32.length - maxBuffer;
-      state.pcmBuffer.copyWithin(0, excess, state.pcmLength);
-      state.pcmLength -= excess;
-    }
-
-    if (state.pcmLength + float32.length > state.pcmBuffer.length) {
-      const newBuf = new Float32Array(
-        Math.max(state.pcmBuffer.length * 2, state.pcmLength + float32.length),
-      );
-      newBuf.set(state.pcmBuffer.subarray(0, state.pcmLength));
-      state.pcmBuffer = newBuf;
-    }
-
-    state.pcmBuffer.set(float32, state.pcmLength);
-    state.pcmLength += float32.length;
+    worklet.port.postMessage({ type: "pcm", samples }, [samples.buffer]);
   });
 
-  state.unlisten = unlisten;
-  nativeAudio = state;
+  nativeAudio = {
+    context,
+    worklet,
+    destination,
+    track: destination.stream.getAudioTracks()[0],
+    unlisten,
+  };
 
   await context.resume().catch(() => {});
-  await tauri.invoke("start_audio_capture", { pid });
+
+  try {
+    await tauri.invoke("start_audio_capture", { pid });
+  } catch (err) {
+    await stopNativeAudio();
+    throw err;
+  }
 }
 
 async function stopNativeAudio() {
   if (!nativeAudio) return;
+
   const state = nativeAudio;
   nativeAudio = null;
 
@@ -346,7 +321,6 @@ async function stopNativeAudio() {
 
   if (state.unlisten) {
     state.unlisten();
-    state.unlisten = null;
   }
 
   if (state.track) {
@@ -354,11 +328,11 @@ async function stopNativeAudio() {
   }
 
   try {
-    state.processor.disconnect();
+    state.worklet.disconnect();
   } catch (_) {}
 
   try {
-    state.context.close();
+    await state.context.close();
   } catch (_) {}
 }
 
