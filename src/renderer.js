@@ -88,6 +88,17 @@ function destroyPeer() {
   setStatus("⚪ Ocioso — clique em Compartilhar ou Assistir para conectar");
 }
 
+function handleViewerDisconnect(peerId) {
+  const hadViewer = connectedViewers.has(peerId);
+
+  connectedViewers.delete(peerId);
+  updateViewerCount();
+
+  if (hadViewer) {
+    playBlip("leave");
+  }
+}
+
 function setupGlobalCallListener() {
   if (globalCallListenerSet) return;
   globalCallListenerSet = true;
@@ -140,6 +151,7 @@ function initPeer() {
           if (!connectedViewers.has(conn.peer)) {
             connectedViewers.add(conn.peer);
             updateViewerCount();
+            playBlip("enter");
           }
 
           if (activeCalls.has(conn.peer)) return;
@@ -153,8 +165,7 @@ function initPeer() {
 
           call.on("close", () => {
             activeCalls.delete(conn.peer);
-            connectedViewers.delete(conn.peer);
-            updateViewerCount();
+            handleViewerDisconnect(conn.peer);
           });
 
           activeCalls.set(conn.peer, call);
@@ -166,8 +177,7 @@ function initPeer() {
           activeCalls.get(conn.peer).close();
           activeCalls.delete(conn.peer);
         }
-        connectedViewers.delete(conn.peer);
-        updateViewerCount();
+        handleViewerDisconnect(conn.peer);
       });
 
       conn.on("error", () => {});
@@ -599,6 +609,7 @@ async function handleDeepLinkRoom(roomId) {
 }
 
 btnStart.addEventListener("click", async () => {
+  getBlipContext();
   try {
     if (tauri) {
       const result = await tauri.invoke("ensure_discord_rpc");
